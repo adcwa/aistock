@@ -5,6 +5,10 @@ import {
   text,
   timestamp,
   integer,
+  decimal,
+  bigint,
+  boolean,
+  json,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -68,6 +72,168 @@ export const invitations = pgTable('invitations', {
   status: varchar('status', { length: 20 }).notNull().default('pending'),
 });
 
+export const stocks = pgTable('stocks', {
+  id: serial('id').primaryKey(),
+  symbol: varchar('symbol', { length: 10 }).notNull().unique(),
+  companyName: varchar('company_name', { length: 255 }).notNull(),
+  sector: varchar('sector', { length: 100 }),
+  industry: varchar('industry', { length: 100 }),
+  marketCap: bigint('market_cap', { mode: 'number' }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 用户观察列表表
+export const watchlists = pgTable('watchlists', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  name: varchar('name', { length: 100 }).notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 观察列表股票关联表
+export const watchlistStocks = pgTable('watchlist_stocks', {
+  id: serial('id').primaryKey(),
+  watchlistId: integer('watchlist_id')
+    .notNull()
+    .references(() => watchlists.id),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  addedAt: timestamp('added_at').notNull().defaultNow(),
+});
+
+// 时间序列价格数据表
+export const stockPrices = pgTable('stock_prices', {
+  id: serial('id').primaryKey(),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  timestamp: timestamp('timestamp').notNull(),
+  open: decimal('open', { precision: 10, scale: 4 }).notNull(),
+  high: decimal('high', { precision: 10, scale: 4 }).notNull(),
+  low: decimal('low', { precision: 10, scale: 4 }).notNull(),
+  close: decimal('close', { precision: 10, scale: 4 }).notNull(),
+  volume: bigint('volume', { mode: 'number' }).notNull(),
+  interval: varchar('interval', { length: 20 }).notNull(), // '1m', '5m', '1h', '1d', '1w', '1mo'
+});
+
+// 基本面数据表
+export const fundamentals = pgTable('fundamentals', {
+  id: serial('id').primaryKey(),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  reportDate: timestamp('report_date').notNull(),
+  quarter: varchar('quarter', { length: 10 }),
+  year: integer('year').notNull(),
+  revenue: bigint('revenue', { mode: 'number' }),
+  netIncome: bigint('net_income', { mode: 'number' }),
+  eps: decimal('eps', { precision: 8, scale: 4 }),
+  pe: decimal('pe', { precision: 8, scale: 2 }),
+  pb: decimal('pb', { precision: 8, scale: 2 }),
+  roe: decimal('roe', { precision: 8, scale: 4 }),
+  debtToEquity: decimal('debt_to_equity', { precision: 8, scale: 4 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 技术指标表
+export const technicalIndicators = pgTable('technical_indicators', {
+  id: serial('id').primaryKey(),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  timestamp: timestamp('timestamp').notNull(),
+  sma50: decimal('sma_50', { precision: 10, scale: 4 }),
+  sma200: decimal('sma_200', { precision: 10, scale: 4 }),
+  rsi14: decimal('rsi_14', { precision: 6, scale: 2 }),
+  macd: decimal('macd', { precision: 10, scale: 6 }),
+  macdSignal: decimal('macd_signal', { precision: 10, scale: 6 }),
+  bbUpper: decimal('bb_upper', { precision: 10, scale: 4 }),
+  bbLower: decimal('bb_lower', { precision: 10, scale: 4 }),
+  obv: bigint('obv', { mode: 'number' }),
+});
+
+// 新闻文章表
+export const newsArticles = pgTable('news_articles', {
+  id: serial('id').primaryKey(),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  title: varchar('title', { length: 500 }).notNull(),
+  content: text('content'),
+  source: varchar('source', { length: 100 }),
+  url: text('url'),
+  publishedAt: timestamp('published_at').notNull(),
+  sentimentScore: decimal('sentiment_score', { precision: 4, scale: 3 }), // -1.000 to 1.000
+  sentimentLabel: varchar('sentiment_label', { length: 20 }), // 'positive', 'neutral', 'negative'
+  summary: text('summary'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 分析推荐记录表
+export const recommendations = pgTable('recommendations', {
+  id: serial('id').primaryKey(),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  timestamp: timestamp('timestamp').notNull().defaultNow(),
+  recommendation: varchar('recommendation', { length: 20 }).notNull(), // 'strong_buy', 'buy', 'hold', 'sell', 'strong_sell'
+  confidence: decimal('confidence', { precision: 4, scale: 3 }).notNull(), // 0.000 to 1.000
+  reasoning: text('reasoning').notNull(),
+  technicalScore: decimal('technical_score', { precision: 4, scale: 3 }),
+  fundamentalScore: decimal('fundamental_score', { precision: 4, scale: 3 }),
+  sentimentScore: decimal('sentiment_score', { precision: 4, scale: 3 }),
+  macroScore: decimal('macro_score', { precision: 4, scale: 3 }),
+});
+
+// 分析历史表 - 用于回溯准确率
+export const analysisHistory = pgTable('analysis_history', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  recommendation: varchar('recommendation', { length: 20 }).notNull(), // 'buy', 'hold', 'sell'
+  confidence: decimal('confidence', { precision: 5, scale: 4 }).notNull(),
+  technicalScore: decimal('technical_score', { precision: 5, scale: 4 }).notNull(),
+  fundamentalScore: decimal('fundamental_score', { precision: 5, scale: 4 }).notNull(),
+  sentimentScore: decimal('sentiment_score', { precision: 5, scale: 4 }).notNull(),
+  macroScore: decimal('macro_score', { precision: 5, scale: 4 }).notNull(),
+  overallScore: decimal('overall_score', { precision: 5, scale: 4 }).notNull(),
+  reasoning: text('reasoning'),
+  aiSentiment: varchar('ai_sentiment', { length: 20 }),
+  aiConfidence: decimal('ai_confidence', { precision: 5, scale: 4 }),
+  aiReasoning: text('ai_reasoning'),
+  actualPrice: decimal('actual_price', { precision: 10, scale: 4 }), // 实际价格（用于验证）
+  predictedPrice: decimal('predicted_price', { precision: 10, scale: 4 }), // 预测价格
+  accuracy: decimal('accuracy', { precision: 5, scale: 4 }), // 准确率
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 用户预警设置表
+export const alerts = pgTable('alerts', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  stockId: integer('stock_id')
+    .notNull()
+    .references(() => stocks.id),
+  type: varchar('type', { length: 50 }).notNull(), // 'price', 'technical', 'recommendation'
+  condition: text('condition').notNull(), // JSON配置
+  isActive: boolean('is_active').notNull().default(true),
+  lastTriggered: timestamp('last_triggered'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamMembers: many(teamMembers),
   activityLogs: many(activityLogs),
@@ -77,6 +243,7 @@ export const teamsRelations = relations(teams, ({ many }) => ({
 export const usersRelations = relations(users, ({ many }) => ({
   teamMembers: many(teamMembers),
   invitationsSent: many(invitations),
+  analysisHistory: many(analysisHistory),
 }));
 
 export const invitationsRelations = relations(invitations, ({ one }) => ({
@@ -112,6 +279,93 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   }),
 }));
 
+export const stocksRelations = relations(stocks, ({ many }) => ({
+  watchlistStocks: many(watchlistStocks),
+  stockPrices: many(stockPrices),
+  fundamentals: many(fundamentals),
+  technicalIndicators: many(technicalIndicators),
+  newsArticles: many(newsArticles),
+  recommendations: many(recommendations),
+  analysisHistory: many(analysisHistory),
+  alerts: many(alerts),
+}));
+
+export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [watchlists.userId],
+    references: [users.id],
+  }),
+  watchlistStocks: many(watchlistStocks),
+}));
+
+export const watchlistStocksRelations = relations(watchlistStocks, ({ one }) => ({
+  watchlist: one(watchlists, {
+    fields: [watchlistStocks.watchlistId],
+    references: [watchlists.id],
+  }),
+  stock: one(stocks, {
+    fields: [watchlistStocks.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const stockPricesRelations = relations(stockPrices, ({ one }) => ({
+  stock: one(stocks, {
+    fields: [stockPrices.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const fundamentalsRelations = relations(fundamentals, ({ one }) => ({
+  stock: one(stocks, {
+    fields: [fundamentals.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const technicalIndicatorsRelations = relations(technicalIndicators, ({ one }) => ({
+  stock: one(stocks, {
+    fields: [technicalIndicators.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const analysisHistoryRelations = relations(analysisHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [analysisHistory.userId],
+    references: [users.id],
+  }),
+  stock: one(stocks, {
+    fields: [analysisHistory.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const newsArticlesRelations = relations(newsArticles, ({ one }) => ({
+  stock: one(stocks, {
+    fields: [newsArticles.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const recommendationsRelations = relations(recommendations, ({ one }) => ({
+  stock: one(stocks, {
+    fields: [recommendations.stockId],
+    references: [stocks.id],
+  }),
+}));
+
+export const alertsRelations = relations(alerts, ({ one }) => ({
+  user: one(users, {
+    fields: [alerts.userId],
+    references: [users.id],
+  }),
+  stock: one(stocks, {
+    fields: [alerts.stockId],
+    references: [stocks.id],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
@@ -140,3 +394,22 @@ export enum ActivityType {
   INVITE_TEAM_MEMBER = 'INVITE_TEAM_MEMBER',
   ACCEPT_INVITATION = 'ACCEPT_INVITATION',
 }
+
+export type Stock = typeof stocks.$inferSelect;
+export type NewStock = typeof stocks.$inferInsert;
+export type Watchlist = typeof watchlists.$inferSelect;
+export type NewWatchlist = typeof watchlists.$inferInsert;
+export type WatchlistStock = typeof watchlistStocks.$inferSelect;
+export type NewWatchlistStock = typeof watchlistStocks.$inferInsert;
+export type StockPrice = typeof stockPrices.$inferSelect;
+export type NewStockPrice = typeof stockPrices.$inferInsert;
+export type Fundamental = typeof fundamentals.$inferSelect;
+export type NewFundamental = typeof fundamentals.$inferInsert;
+export type TechnicalIndicator = typeof technicalIndicators.$inferSelect;
+export type NewTechnicalIndicator = typeof technicalIndicators.$inferInsert;
+export type NewsArticle = typeof newsArticles.$inferSelect;
+export type NewNewsArticle = typeof newsArticles.$inferInsert;
+export type Recommendation = typeof recommendations.$inferSelect;
+export type NewRecommendation = typeof recommendations.$inferInsert;
+export type Alert = typeof alerts.$inferSelect;
+export type NewAlert = typeof alerts.$inferInsert;

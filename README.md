@@ -1,28 +1,30 @@
-# Next.js SaaS Starter
+# InsightTrader - AI-Powered Stock Analysis Platform
 
-This is a starter template for building a SaaS application using **Next.js** with support for authentication, Stripe integration for payments, and a dashboard for logged-in users.
+InsightTrader是一个基于AI的智能股票分析平台，结合技术分析、基本面分析和AI智能推荐，为投资者提供全面的股票分析服务。
 
-**Demo: [https://next-saas-start.vercel.app/](https://next-saas-start.vercel.app/)**
+## 功能特性
 
-## Features
+- 🏠 **首页展示**: 未登录用户可访问首页和定价页面，了解系统功能
+- 🔍 **股票搜索**: 支持股票代码和公司名称搜索
+- 📊 **技术分析**: RSI、MACD、移动平均线、布林带等技术指标
+- 💰 **基本面分析**: P/E比率、P/B比率、ROE、债务比率等财务指标
+- 🤖 **AI智能分析**: 基于真实AI模型的股票分析和投资建议
+- ⚙️ **AI配置管理**: 支持自定义OpenAI API配置，包括基础URL、模型选择等
+- 📈 **历史数据**: 股票价格历史数据和趋势分析
+- 📋 **观察列表**: 创建和管理个人股票观察列表
+- 🔐 **用户认证**: 安全的用户注册和登录系统
+- ⏳ **分析等待效果**: 美观的AI分析等待动画
 
-- Marketing landing page (`/`) with animated Terminal element
-- Pricing page (`/pricing`) which connects to Stripe Checkout
-- Dashboard pages with CRUD operations on users/teams
-- Basic RBAC with Owner and Member roles
-- Subscription management with Stripe Customer Portal
-- Email/password authentication with JWTs stored to cookies
-- Global middleware to protect logged-in routes
-- Local middleware to protect Server Actions or validate Zod schemas
-- Activity logging system for any user events
+## 技术栈
 
-## Tech Stack
-
-- **Framework**: [Next.js](https://nextjs.org/)
-- **Database**: [Postgres](https://www.postgresql.org/)
-- **ORM**: [Drizzle](https://orm.drizzle.team/)
-- **Payments**: [Stripe](https://stripe.com/)
-- **UI Library**: [shadcn/ui](https://ui.shadcn.com/)
+- **框架**: [Next.js 15](https://nextjs.org/) - React全栈框架
+- **数据库**: [PostgreSQL](https://www.postgresql.org/) - 关系型数据库
+- **ORM**: [Drizzle](https://orm.drizzle.team/) - TypeScript ORM
+- **AI服务**: [OpenAI API](https://openai.com/) - AI分析和推荐
+- **数据源**: [Alpha Vantage](https://www.alphavantage.co/) - 股票数据API
+- **支付**: [Stripe](https://stripe.com/) - 支付处理
+- **UI组件**: [shadcn/ui](https://ui.shadcn.com/) - 现代化UI组件库
+- **样式**: [Tailwind CSS](https://tailwindcss.com/) - 实用优先的CSS框架
 
 ## Getting Started
 

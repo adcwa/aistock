@@ -8,6 +8,20 @@
       "when": 1726443359662,
       "tag": "0000_soft_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1755938181201,
+      "tag": "0001_flowery_steel_serpent",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1755956552926,
+      "tag": "0002_optimal_mulholland_black",
+      "breakpoints": true
     }
   ]
 }

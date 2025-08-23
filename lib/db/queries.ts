@@ -3,37 +3,85 @@ import { db } from './drizzle';
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/session';
+import { logger } from '@/lib/utils/logger';
 
 export async function getUser() {
-  const sessionCookie = (await cookies()).get('session');
-  if (!sessionCookie || !sessionCookie.value) {
-    return null;
+  try {
+    logger.debug('Getting user from session', { action: 'getUser' });
+    
+    const sessionCookie = (await cookies()).get('session');
+    if (!sessionCookie || !sessionCookie.value) {
+      logger.debug('No session cookie found', { action: 'getUser' });
+      return null;
+    }
+
+    logger.debug('Session cookie found', { 
+      action: 'getUser',
+      sessionLength: sessionCookie.value.length 
+    });
+
+    const sessionData = await verifyToken(sessionCookie.value);
+    logger.debug('Session data verified', { 
+      action: 'getUser',
+      hasUser: !!sessionData?.user,
+      userId: sessionData?.user?.id,
+      expires: sessionData?.expires
+    });
+
+    if (
+      !sessionData ||
+      !sessionData.user ||
+      typeof sessionData.user.id !== 'number'
+    ) {
+      logger.warn('Invalid session data', { 
+        action: 'getUser',
+        sessionData: JSON.stringify(sessionData)
+      });
+      return null;
+    }
+
+    if (new Date(sessionData.expires) < new Date()) {
+      logger.warn('Session expired', { 
+        action: 'getUser',
+        expires: sessionData.expires,
+        now: new Date().toISOString()
+      });
+      return null;
+    }
+
+    logger.dbQuery('SELECT', 'users', { userId: sessionData.user.id });
+    
+    const user = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
+      .limit(1);
+
+    logger.debug('User query completed', { 
+      action: 'getUser',
+      userId: sessionData.user.id,
+      userFound: user.length > 0
+    });
+
+    if (user.length === 0) {
+      logger.warn('User not found in database', { 
+        action: 'getUser',
+        userId: sessionData.user.id
+      });
+      return null;
+    }
+
+    logger.info('User retrieved successfully', { 
+      action: 'getUser',
+      userId: user[0].id,
+      email: user[0].email
+    });
+
+    return user[0];
+  } catch (error) {
+    logger.dbError('SELECT', 'users', error as Error, { action: 'getUser' });
+    throw error;
   }
-
-  const sessionData = await verifyToken(sessionCookie.value);
-  if (
-    !sessionData ||
-    !sessionData.user ||
-    typeof sessionData.user.id !== 'number'
-  ) {
-    return null;
-  }
-
-  if (new Date(sessionData.expires) < new Date()) {
-    return null;
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.id, sessionData.user.id), isNull(users.deletedAt)))
-    .limit(1);
-
-  if (user.length === 0) {
-    return null;
-  }
-
-  return user[0];
 }
 
 export async function getTeamByStripeCustomerId(customerId: string) {
@@ -65,17 +113,33 @@ export async function updateTeamSubscription(
 }
 
 export async function getUserWithTeam(userId: number) {
-  const result = await db
-    .select({
-      user: users,
-      teamId: teamMembers.teamId
-    })
-    .from(users)
-    .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-    .where(eq(users.id, userId))
-    .limit(1);
+  try {
+    logger.dbQuery('SELECT with JOIN', 'users + teamMembers', { userId });
+    
+    const result = await db
+      .select({
+        user: users,
+        teamId: teamMembers.teamId
+      })
+      .from(users)
+      .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
+      .where(eq(users.id, userId))
+      .limit(1);
 
-  return result[0];
+    logger.debug('User with team query completed', { 
+      action: 'getUserWithTeam',
+      userId,
+      hasTeam: !!result[0]?.teamId
+    });
+
+    return result[0];
+  } catch (error) {
+    logger.dbError('SELECT with JOIN', 'users + teamMembers', error as Error, { 
+      action: 'getUserWithTeam',
+      userId 
+    });
+    throw error;
+  }
 }
 
 export async function getActivityLogs() {

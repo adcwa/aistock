@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/drizzle';
+import { logger } from '@/lib/utils/logger';
 import {
   User,
   users,
@@ -32,16 +33,50 @@ async function logActivity(
   type: ActivityType,
   ipAddress?: string
 ) {
-  if (teamId === null || teamId === undefined) {
-    return;
+  try {
+    if (teamId === null || teamId === undefined) {
+      logger.debug('Skipping activity log - no team ID', { 
+        action: 'logActivity',
+        userId,
+        type,
+        teamId 
+      });
+      return;
+    }
+    
+    logger.debug('Logging activity', { 
+      action: 'logActivity',
+      teamId,
+      userId,
+      type,
+      ipAddress 
+    });
+
+    const newActivity: NewActivityLog = {
+      teamId,
+      userId,
+      action: type,
+      ipAddress: ipAddress || ''
+    };
+    
+    logger.dbQuery('INSERT', 'activityLogs', { teamId, userId, type });
+    await db.insert(activityLogs).values(newActivity);
+    
+    logger.info('Activity logged successfully', { 
+      action: 'logActivity',
+      teamId,
+      userId,
+      type 
+    });
+  } catch (error) {
+    logger.dbError('INSERT', 'activityLogs', error as Error, { 
+      action: 'logActivity',
+      teamId,
+      userId,
+      type 
+    });
+    // 不抛出错误，避免影响主要功能
   }
-  const newActivity: NewActivityLog = {
-    teamId,
-    userId,
-    action: type,
-    ipAddress: ipAddress || ''
-  };
-  await db.insert(activityLogs).values(newActivity);
 }
 
 const signInSchema = z.object({
@@ -50,9 +85,14 @@ const signInSchema = z.object({
 });
 
 export const signIn = validatedAction(signInSchema, async (data, formData) => {
-  const { email, password } = data;
+  try {
+    const { email, password } = data;
+    
+    logger.auth('SIGN_IN_ATTEMPT', undefined, { email });
 
-  const userWithTeam = await db
+    logger.dbQuery('SELECT with JOIN', 'users + teamMembers + teams', { email });
+    
+      const userWithTeam = await db
     .select({
       user: users,
       team: teams
@@ -63,41 +103,76 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
     .where(eq(users.email, email))
     .limit(1);
 
-  if (userWithTeam.length === 0) {
-    return {
-      error: 'Invalid email or password. Please try again.',
+    logger.debug('User query completed', { 
+      action: 'signIn',
       email,
-      password
-    };
+      userFound: userWithTeam.length > 0,
+      hasTeam: userWithTeam.length > 0 ? !!userWithTeam[0].team : false
+    });
+
+    if (userWithTeam.length === 0) {
+      logger.warn('Sign in failed - user not found', { 
+        action: 'signIn',
+        email 
+      });
+      return {
+        error: 'Invalid email or password. Please try again.',
+        email,
+        password
+      };
+    }
+
+    const { user: foundUser, team: foundTeam } = userWithTeam[0];
+    
+    logger.debug('User found, validating password', { 
+      action: 'signIn',
+      userId: foundUser.id,
+      email: foundUser.email,
+      hasTeam: !!foundTeam
+    });
+
+    const isPasswordValid = await comparePasswords(
+      password,
+      foundUser.passwordHash
+    );
+
+    if (!isPasswordValid) {
+      logger.warn('Sign in failed - invalid password', { 
+        action: 'signIn',
+        userId: foundUser.id,
+        email 
+      });
+      return {
+        error: 'Invalid email or password. Please try again.',
+        email,
+        password
+      };
+    }
+
+    logger.info('Password validated, setting session', { 
+      action: 'signIn',
+      userId: foundUser.id,
+      email 
+    });
+
+    await Promise.all([
+      setSession(foundUser),
+      logActivity(foundTeam?.id, foundUser.id, ActivityType.SIGN_IN)
+    ]);
+
+    logger.auth('SIGN_IN_SUCCESS', foundUser.id, { email });
+
+    const redirectTo = formData.get('redirect') as string | null;
+    if (redirectTo === 'checkout') {
+      const priceId = formData.get('priceId') as string;
+      return createCheckoutSession({ team: foundTeam, priceId });
+    }
+
+    redirect('/dashboard');
+  } catch (error) {
+    logger.authError('SIGN_IN', error as Error, { email: data.email });
+    throw error;
   }
-
-  const { user: foundUser, team: foundTeam } = userWithTeam[0];
-
-  const isPasswordValid = await comparePasswords(
-    password,
-    foundUser.passwordHash
-  );
-
-  if (!isPasswordValid) {
-    return {
-      error: 'Invalid email or password. Please try again.',
-      email,
-      password
-    };
-  }
-
-  await Promise.all([
-    setSession(foundUser),
-    logActivity(foundTeam?.id, foundUser.id, ActivityType.SIGN_IN)
-  ]);
-
-  const redirectTo = formData.get('redirect') as string | null;
-  if (redirectTo === 'checkout') {
-    const priceId = formData.get('priceId') as string;
-    return createCheckoutSession({ team: foundTeam, priceId });
-  }
-
-  redirect('/dashboard');
 });
 
 const signUpSchema = z.object({

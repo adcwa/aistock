@@ -5,6 +5,6 @@ export default {
   out: './lib/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.POSTGRES_URL!,
+    url: process.env.POSTGRES_URL || 'postgresql://admin:Admin123@localhost:5432/aistock',
   },
 } satisfies Config;
