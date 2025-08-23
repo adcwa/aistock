@@ -148,8 +148,29 @@ export async function GET(
     const priceValues = prices.map(p => parseFloat(p.close.toString())).reverse();
     const volumeValues = prices.map(p => p.volume).reverse();
     
-    const technicalIndicators = technicalEngine.getLatestIndicators(priceValues, volumeValues);
-    const technicalScore = technicalEngine.calculateTechnicalScore(technicalIndicators);
+    // 计算技术指标
+    const sma50 = technicalEngine.calculateSMA(priceValues, 50);
+    const sma200 = technicalEngine.calculateSMA(priceValues, 200);
+    const rsi14 = technicalEngine.calculateRSI(priceValues, 14);
+    const macd = technicalEngine.calculateMACD(priceValues);
+    const bb = technicalEngine.calculateBollingerBands(priceValues);
+    const obv = technicalEngine.calculateOBV(priceValues, volumeValues);
+    
+    // 获取最新指标值
+    const technicalIndicators = {
+      sma50: sma50.length > 0 ? sma50[sma50.length - 1] : undefined,
+      sma200: sma200.length > 0 ? sma200[sma200.length - 1] : undefined,
+      rsi14: rsi14.length > 0 ? rsi14[rsi14.length - 1] : undefined,
+      macd: macd.macd.length > 0 ? macd.macd[macd.macd.length - 1] : undefined,
+      macdSignal: macd.signal.length > 0 ? macd.signal[macd.signal.length - 1] : undefined,
+      bbUpper: bb.upper.length > 0 ? bb.upper[bb.upper.length - 1] : undefined,
+      bbLower: bb.lower.length > 0 ? bb.lower[bb.lower.length - 1] : undefined,
+      bbMiddle: bb.middle.length > 0 ? bb.middle[bb.middle.length - 1] : undefined,
+      obv: obv.length > 0 ? obv[obv.length - 1] : undefined,
+    };
+    
+    const currentPrice = priceValues.length > 0 ? priceValues[0] : 0;
+    const technicalScore = technicalEngine.calculateTechnicalScore(technicalIndicators, currentPrice);
 
     // 进行基本面分析
     const fundamentalDataConverted = fundamentalData.map(f => ({
@@ -166,9 +187,28 @@ export async function GET(
     // AI分析
     const aiAnalysis = await aiAnalysisService.analyzeStock({
       symbol: symbolUpper,
-      technicalData: technicalIndicators,
-      fundamentalData: financialRatios,
-      newsData: [], // 暂时为空，后续可以集成新闻API
+      currentPrice,
+      priceHistory: prices.map(p => ({
+        date: p.timestamp.toISOString().split('T')[0],
+        open: parseFloat(p.open.toString()),
+        high: parseFloat(p.high.toString()),
+        low: parseFloat(p.low.toString()),
+        close: parseFloat(p.close.toString()),
+        volume: p.volume,
+      })),
+      technicalIndicators,
+      fundamentalData: fundamentalDataConverted[0], // 使用最新的基本面数据
+      marketContext: {
+        sector: stock[0]?.sector || '',
+        industry: stock[0]?.industry || '',
+        marketCap: stock[0]?.marketCap || 0,
+      },
+      newsSentiment: {
+        positive: 0,
+        negative: 0,
+        neutral: 0,
+        recentHeadlines: [],
+      },
     });
 
     // 使用AI分析结果
@@ -188,9 +228,6 @@ export async function GET(
 
     const overallScore = recommendationEngine.calculateOverallScore(analysisScores);
     const recommendation = recommendationEngine.generateRecommendation(overallScore);
-
-    // 获取当前价格用于预测
-    const currentPrice = prices.length > 0 ? parseFloat(prices[0].close) : 0;
 
     // 生成价格预测
     let pricePrediction = null;

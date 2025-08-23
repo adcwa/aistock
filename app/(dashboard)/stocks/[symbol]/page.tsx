@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, BarChart3, Target, Brain, History } from 'lucide-react';
+import AdvancedStockChart from '@/components/charts/AdvancedStockChart';
+import BacktestingPanel from '@/components/backtesting/BacktestingPanel';
 
 interface Stock {
   id: number;
@@ -111,8 +114,28 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
   useEffect(() => {
     params.then(({ symbol }) => {
       loadStockAnalysis(symbol);
+      // 记录搜索历史
+      recordSearchHistory(symbol);
     });
   }, [params]);
+
+  const recordSearchHistory = async (symbol: string) => {
+    try {
+      await fetch('/api/search-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: 1, // 模拟用户ID
+          symbol: symbol.toUpperCase(),
+          companyName: '', // 将在loadStockAnalysis中更新
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to record search history:', error);
+    }
+  };
 
   const loadStockAnalysis = async (symbol?: string) => {
     if (!symbol) return;
@@ -198,13 +221,7 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
               </div>
             </div>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-2">AI分析进行中...</h3>
-          <p className="text-gray-600 mb-4">正在收集和分析股票数据</p>
-          <div className="flex justify-center space-x-2">
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-            <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          </div>
+          <p className="mt-4 text-gray-600">正在加载股票分析数据...</p>
         </div>
       </div>
     );
@@ -527,6 +544,429 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
           </div>
         </CardContent>
       </Card>
+
+      {/* 新增功能标签页 */}
+      <Tabs defaultValue="analysis" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="analysis" className="flex items-center gap-2">
+            <Brain className="w-4 h-4" />
+            智能分析
+          </TabsTrigger>
+          <TabsTrigger value="charts" className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            图表分析
+          </TabsTrigger>
+          <TabsTrigger value="backtesting" className="flex items-center gap-2">
+            <Target className="w-4 h-4" />
+            回溯分析
+          </TabsTrigger>
+          <TabsTrigger value="ai-insights" className="flex items-center gap-2">
+            <Brain className="w-4 h-4" />
+            AI洞察
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="analysis" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>AI智能分析</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">AI分析结果</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>情绪:</span>
+                        <Badge variant={analysis.ai.sentiment === 'bullish' ? 'default' : 
+                                       analysis.ai.sentiment === 'bearish' ? 'destructive' : 'secondary'}>
+                          {analysis.ai.sentiment === 'bullish' ? '看涨' : 
+                           analysis.ai.sentiment === 'bearish' ? '看跌' : '中性'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>置信度:</span>
+                        <span className="font-semibold">{(analysis.ai.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <h5 className="font-medium text-sm mb-1">分析理由:</h5>
+                      <p className="text-sm text-gray-700">{analysis.ai.reasoning}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">关键因素</h4>
+                    <ul className="space-y-1">
+                      {analysis.ai.keyFactors.map((factor, index) => (
+                        <li key={index} className="text-sm flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span>{factor}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="p-4 border rounded-lg">
+                  <h4 className="font-semibold mb-2 text-red-600">风险因素</h4>
+                  <ul className="space-y-1">
+                    {analysis.ai.riskFactors.map((risk, index) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="text-red-600 mt-0.5">⚠</span>
+                        <span>{risk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="charts" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>高级图表分析</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdvancedStockChart
+                symbol={stock.symbol}
+                priceData={generateMockPriceData(stock.symbol, 100)}
+                indicators={generateMockIndicators()}
+                timeframe="1M"
+                onTimeframeChange={(timeframe) => console.log('Timeframe changed:', timeframe)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="backtesting" className="mt-6">
+          <BacktestingPanel
+            symbol={stock.symbol}
+            priceData={generateMockPriceData(stock.symbol, 252)}
+            onBacktestComplete={(result) => console.log('Backtest completed:', result)}
+          />
+        </TabsContent>
+        
+        <TabsContent value="ai-insights" className="mt-6">
+          <div className="space-y-6">
+            {/* AI深度洞察 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>AI深度洞察</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-semibold mb-2">技术信号分析</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>趋势:</span>
+                          <Badge variant={analysis.ai.sentiment === 'bullish' ? 'default' : 
+                                         analysis.ai.sentiment === 'bearish' ? 'destructive' : 'secondary'}>
+                            {analysis.ai.sentiment === 'bullish' ? '上升' : 
+                             analysis.ai.sentiment === 'bearish' ? '下降' : '横盘'}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>强度:</span>
+                          <span className="font-semibold">中等</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-semibold mb-2">交易策略建议</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>入场点:</span>
+                          <span className="font-semibold">${(analysis.pricePrediction?.currentPrice || 100).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>止损:</span>
+                          <span className="font-semibold text-red-600">
+                            ${((analysis.pricePrediction?.currentPrice || 100) * 0.95).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>止盈:</span>
+                          <span className="font-semibold text-green-600">
+                            ${((analysis.pricePrediction?.currentPrice || 100) * 1.05).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">AI推荐摘要</h4>
+                    <p className="text-gray-700">{analysis.ai.summary}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 分析历史 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>分析历史</span>
+                  <Button variant="outline" size="sm" onClick={() => window.location.href = '/stocks?tab=analysis'}>
+                    <History className="w-4 h-4 mr-1" />
+                    查看全部历史
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AnalysisHistoryPanel symbol={stock.symbol} />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// 生成模拟价格数据
+function generateMockPriceData(symbol: string, days: number) {
+  const data = [];
+  let price = 100; // 起始价格
+  const volatility = 0.02; // 日波动率
+
+  for (let i = 0; i < days; i++) {
+    const date = new Date();
+    date.setDate(date.getDate() - (days - i));
+    
+    // 生成随机价格变动
+    const change = (Math.random() - 0.5) * volatility;
+    price = price * (1 + change);
+    
+    const open = price;
+    const high = price * (1 + Math.random() * 0.01);
+    const low = price * (1 - Math.random() * 0.01);
+    const close = price * (1 + (Math.random() - 0.5) * 0.005);
+    const volume = Math.floor(Math.random() * 1000000) + 100000;
+
+    data.push({
+      date: date.toISOString().split('T')[0],
+      open,
+      high,
+      low,
+      close,
+      volume
+    });
+  }
+
+  return data;
+}
+
+// 生成模拟技术指标数据
+function generateMockIndicators() {
+  const days = 100;
+  const indicators: {
+    sma50: number[];
+    sma200: number[];
+    rsi14: number[];
+    macd: number[];
+    macdSignal: number[];
+    macdHistogram: number[];
+    bbUpper: number[];
+    bbMiddle: number[];
+    bbLower: number[];
+    stochK: number[];
+    stochD: number[];
+    williamsR: number[];
+    atr: number[];
+    adx: number[];
+    cci: number[];
+    mfi: number[];
+    obv: number[];
+  } = {
+    sma50: [],
+    sma200: [],
+    rsi14: [],
+    macd: [],
+    macdSignal: [],
+    macdHistogram: [],
+    bbUpper: [],
+    bbMiddle: [],
+    bbLower: [],
+    stochK: [],
+    stochD: [],
+    williamsR: [],
+    atr: [],
+    adx: [],
+    cci: [],
+    mfi: [],
+    obv: []
+  };
+
+  for (let i = 0; i < days; i++) {
+    indicators.sma50.push(100 + Math.random() * 10);
+    indicators.sma200.push(98 + Math.random() * 8);
+    indicators.rsi14.push(30 + Math.random() * 40);
+    indicators.macd.push((Math.random() - 0.5) * 2);
+    indicators.macdSignal.push((Math.random() - 0.5) * 2);
+    indicators.macdHistogram.push((Math.random() - 0.5) * 1);
+    indicators.bbUpper.push(105 + Math.random() * 5);
+    indicators.bbMiddle.push(100 + Math.random() * 3);
+    indicators.bbLower.push(95 + Math.random() * 5);
+    indicators.stochK.push(Math.random() * 100);
+    indicators.stochD.push(Math.random() * 100);
+    indicators.williamsR.push(-80 + Math.random() * 60);
+    indicators.atr.push(2 + Math.random() * 3);
+    indicators.adx.push(20 + Math.random() * 40);
+    indicators.cci.push((Math.random() - 0.5) * 200);
+    indicators.mfi.push(Math.random() * 100);
+    indicators.obv.push(1000000 + Math.random() * 1000000);
+  }
+
+  return indicators;
+}
+
+// 分析历史面板组件
+function AnalysisHistoryPanel({ symbol }: { symbol: string }) {
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAnalysisHistory();
+  }, [symbol]);
+
+  const loadAnalysisHistory = async () => {
+    try {
+      const response = await fetch(`/api/analysis/history?userId=1&limit=5`);
+      if (response.ok) {
+        const data = await response.json();
+        // 过滤出当前股票的分析历史
+        const filteredHistory = data.filter((item: any) => 
+          item.stockSymbol.toLowerCase() === symbol.toLowerCase()
+        );
+        setHistory(filteredHistory);
+      }
+    } catch (error) {
+      console.error('Failed to load analysis history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}分钟前`;
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)}小时前`;
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)}天前`;
+    }
+  };
+
+  const getRecommendationColor = (recommendation: string) => {
+    switch (recommendation) {
+      case 'strong_buy':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'buy':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'hold':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'sell':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'strong_sell':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getRecommendationText = (recommendation: string) => {
+    switch (recommendation) {
+      case 'strong_buy':
+        return '强烈买入';
+      case 'buy':
+        return '买入';
+      case 'hold':
+        return '持有';
+      case 'sell':
+        return '卖出';
+      case 'strong_sell':
+        return '强烈卖出';
+      default:
+        return '未知';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-200 border-t-blue-600 mx-auto"></div>
+        <p className="text-gray-500 mt-2">加载分析历史...</p>
+      </div>
+    );
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Brain className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+        <p className="text-gray-500">暂无分析历史</p>
+        <p className="text-sm text-gray-400">这是首次分析该股票</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {history.map((item) => (
+        <div
+          key={item.id}
+          className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              <Badge className={getRecommendationColor(item.recommendation)}>
+                {getRecommendationText(item.recommendation)}
+              </Badge>
+              <span className="text-sm text-gray-600">
+                置信度: {(item.confidence * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="text-xs text-gray-500">
+              {formatDate(item.createdAt)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+            <div className="text-center">
+              <div className="text-sm text-gray-600">技术评分</div>
+              <div className="font-semibold">{(item.technicalScore * 100).toFixed(1)}%</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-gray-600">基本面评分</div>
+              <div className="font-semibold">{(item.fundamentalScore * 100).toFixed(1)}%</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-gray-600">情感评分</div>
+              <div className="font-semibold">{(item.sentimentScore * 100).toFixed(1)}%</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-gray-600">综合评分</div>
+              <div className="font-semibold">{(item.overallScore * 100).toFixed(1)}%</div>
+            </div>
+          </div>
+
+          <div className="text-sm text-gray-600 max-w-md truncate">
+            {item.reasoning}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

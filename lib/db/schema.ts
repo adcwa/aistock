@@ -234,6 +234,17 @@ export const alerts = pgTable('alerts', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// 搜索历史表
+export const searchHistory = pgTable('search_history', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id),
+  symbol: varchar('symbol', { length: 10 }).notNull(),
+  companyName: varchar('company_name', { length: 255 }),
+  searchedAt: timestamp('searched_at').notNull().defaultNow(),
+});
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamMembers: many(teamMembers),
   activityLogs: many(activityLogs),
@@ -244,6 +255,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   teamMembers: many(teamMembers),
   invitationsSent: many(invitations),
   analysisHistory: many(analysisHistory),
+  searchHistory: many(searchHistory),
 }));
 
 export const invitationsRelations = relations(invitations, ({ one }) => ({
@@ -296,6 +308,13 @@ export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
     references: [users.id],
   }),
   watchlistStocks: many(watchlistStocks),
+}));
+
+export const searchHistoryRelations = relations(searchHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [searchHistory.userId],
+    references: [users.id],
+  }),
 }));
 
 export const watchlistStocksRelations = relations(watchlistStocks, ({ one }) => ({
@@ -413,3 +432,5 @@ export type Recommendation = typeof recommendations.$inferSelect;
 export type NewRecommendation = typeof recommendations.$inferInsert;
 export type Alert = typeof alerts.$inferSelect;
 export type NewAlert = typeof alerts.$inferInsert;
+export type SearchHistory = typeof searchHistory.$inferSelect;
+export type NewSearchHistory = typeof searchHistory.$inferInsert;
