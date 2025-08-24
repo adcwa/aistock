@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CircleIcon, Loader2, Eye, EyeOff, Mail, Lock, User, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
+import { Circle, Loader2, Eye, EyeOff, Mail, Lock, User, TrendingUp, CheckCircle, AlertCircle } from 'lucide-react';
 import { signUp } from './actions';
 import { ActionState } from '@/lib/auth/middleware';
 import { useState } from 'react';
@@ -204,10 +204,10 @@ export function SignUpForm() {
 
             {state?.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-600 text-sm flex items-center gap-2">
-                  <CircleIcon className="h-4 w-4" />
-                  {state.error}
-                </p>
+                                           <p className="text-red-600 text-sm flex items-center gap-2">
+                             <Circle className="h-4 w-4" />
+                             {state.error}
+                           </p>
               </div>
             )}
 
@@ -269,9 +269,9 @@ export function SignUpForm() {
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <CircleIcon className="h-4 w-4 text-blue-600" />
-                </div>
+                                           <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                             <Circle className="h-4 w-4 text-blue-600" />
+                           </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">实时数据</p>
                   <p className="text-xs text-gray-500">市场数据实时更新</p>

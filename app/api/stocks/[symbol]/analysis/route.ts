@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
-import { stocks, stockPrices, fundamentals, technicalIndicators, recommendations } from '@/lib/db/schema';
+import { stocks, stockPrices, fundamentals, technicalIndicators, recommendations, analysisHistory } from '@/lib/db/schema';
 import { AlphaVantageService } from '@/lib/services/alpha-vantage';
 import { TechnicalAnalysisEngine } from '@/lib/analysis/technical';
 import { FundamentalAnalysisEngine } from '@/lib/analysis/fundamental';
@@ -8,7 +8,7 @@ import { RecommendationEngine } from '@/lib/analysis/recommendation';
 import { AIAnalysisService } from '@/lib/services/ai-analysis';
 import { AnalysisHistoryService } from '@/lib/services/analysis-history';
 
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 
 const alphaVantageService = new AlphaVantageService();
 const technicalEngine = new TechnicalAnalysisEngine();
@@ -35,6 +35,10 @@ export async function GET(
   try {
     const { symbol } = await params;
     const symbolUpper = symbol.toUpperCase();
+    
+    // 获取查询参数
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('force') === 'true';
 
     // 获取股票信息
     const stock = await db
@@ -51,6 +55,80 @@ export async function GET(
     }
 
     const stockId = stock[0].id;
+
+        // 检查是否有今天的分析结果（如果不强制刷新）
+    if (!forceRefresh) {
+      // 获取用户信息
+      const user = await getUserSafely();
+      
+      if (user) {
+        // 从分析历史表获取最新的分析结果
+        const existingAnalysis = await db
+          .select()
+          .from(analysisHistory)
+          .where(
+            and(
+              eq(analysisHistory.stockId, stockId),
+              eq(analysisHistory.userId, user.id),
+              sql`DATE(${analysisHistory.createdAt}) = DATE(${sql`CURRENT_DATE`})`
+            )
+          )
+          .orderBy(desc(analysisHistory.createdAt))
+          .limit(1);
+
+        if (existingAnalysis.length > 0) {
+          const cachedAnalysis = existingAnalysis[0];
+          
+          // 返回缓存的分析结果，使用实际的分析数据
+          return NextResponse.json({
+            stock: stock[0],
+            analysis: {
+              technical: {
+                indicators: {}, // 简化返回，避免重复计算
+                score: parseFloat((cachedAnalysis.technicalScore ?? 0).toString()),
+              },
+              fundamental: {
+                ratios: {},
+                score: parseFloat((cachedAnalysis.fundamentalScore ?? 0).toString()),
+                summary: '使用今日缓存的分析结果',
+              },
+              ai: {
+                sentiment: cachedAnalysis.aiSentiment || 'neutral',
+                confidence: parseFloat((cachedAnalysis.aiConfidence ?? 0.5).toString()),
+                reasoning: cachedAnalysis.aiReasoning || '使用今日缓存的分析结果',
+                keyFactors: [],
+                riskFactors: [],
+                recommendation: '使用今日缓存的分析结果',
+                summary: '使用今日缓存的分析结果',
+              },
+              recommendation: {
+                recommendation: cachedAnalysis.recommendation,
+                confidence: parseFloat(cachedAnalysis.confidence.toString()),
+                reasoning: cachedAnalysis.reasoning || '使用今日缓存的分析结果',
+                summary: '使用今日缓存的分析结果',
+                riskWarning: '基于今日缓存数据的分析结果',
+              },
+              pricePrediction: null,
+              scores: {
+                technical: parseFloat((cachedAnalysis.technicalScore ?? 0).toString()),
+                fundamental: parseFloat((cachedAnalysis.fundamentalScore ?? 0).toString()),
+                sentiment: parseFloat((cachedAnalysis.sentimentScore ?? 0).toString()),
+                macro: parseFloat((cachedAnalysis.macroScore ?? 0).toString()),
+              },
+              overallScore: parseFloat((cachedAnalysis.overallScore ?? 0.5).toString()),
+              confidence: parseFloat(cachedAnalysis.confidence.toString()),
+            },
+            dataPoints: {
+              prices: 0,
+              fundamentals: 0,
+            },
+            cached: true,
+            cachedAt: cachedAnalysis.createdAt,
+            analysisHistoryId: cachedAnalysis.id,
+          });
+        }
+      }
+    }
 
     // 获取价格数据
     const prices = await db

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, BarChart3, Target, Brain, History } from 'lucide-react';
+import { ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, BarChart3, Target, Brain, History, Clock, RefreshCw, Circle } from 'lucide-react';
 import AdvancedStockChart from '@/components/charts/AdvancedStockChart';
 import BacktestingPanel from '@/components/backtesting/BacktestingPanel';
 
@@ -110,14 +110,23 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
   const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    
     params.then(({ symbol }) => {
-      loadStockAnalysis(symbol);
-      // 记录搜索历史
-      recordSearchHistory(symbol);
+      if (isMounted) {
+        loadStockAnalysis(symbol);
+        // 记录搜索历史
+        recordSearchHistory(symbol);
+      }
     });
-  }, [params]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const recordSearchHistory = async (symbol: string) => {
     try {
@@ -137,14 +146,22 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
     }
   };
 
-  const loadStockAnalysis = async (symbol?: string) => {
+  const loadStockAnalysis = async (symbol?: string, forceRefresh = false) => {
     if (!symbol) return;
     
-    setLoading(true);
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     
     try {
-      const response = await fetch(`/api/stocks/${symbol}/analysis`);
+      const url = forceRefresh 
+        ? `/api/stocks/${symbol}/analysis?force=true`
+        : `/api/stocks/${symbol}/analysis`;
+        
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAnalysisData(data);
@@ -155,8 +172,16 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
       console.error('Failed to load stock analysis:', error);
       setError('Failed to load stock analysis');
     } finally {
-      setLoading(false);
+      if (forceRefresh) {
+        setIsRefreshing(false);
+      } else {
+        setLoading(false);
+      }
     }
+  };
+
+  const handleRefreshAnalysis = () => {
+    params.then(({ symbol }) => loadStockAnalysis(symbol, true));
   };
 
 
@@ -254,10 +279,43 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
                 {stock.industry && <Badge variant="outline">{stock.industry}</Badge>}
                 <Badge variant="outline">{formatMarketCap(stock.marketCap)}</Badge>
               </div>
+              {/* 缓存状态显示 */}
+              {(analysisData as any).cached && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="secondary" className="text-xs">
+                    <Clock className="w-3 h-3 mr-1" />
+                    今日缓存
+                  </Badge>
+                  <span className="text-xs text-gray-500">
+                    更新时间: {new Date((analysisData as any).cachedAt).toLocaleTimeString()}
+                  </span>
+                </div>
+              )}
             </div>
-            <Badge className={`text-lg px-4 py-2 ${getRecommendationColor(analysis.recommendation.recommendation)}`}>
-              {getRecommendationText(analysis.recommendation.recommendation)}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={`text-lg px-4 py-2 ${getRecommendationColor(analysis.recommendation.recommendation)}`}>
+                {getRecommendationText(analysis.recommendation.recommendation)}
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshAnalysis}
+                disabled={isRefreshing}
+                className="flex items-center gap-2"
+              >
+                {isRefreshing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-blue-600"></div>
+                    重新分析中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    重新分析
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CircleIcon, TrendingUp, BarChart3, Brain, Shield, Zap, Users, Target } from 'lucide-react';
+import { Circle, TrendingUp, BarChart3, Brain, Shield, Zap, Users, Target } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -10,7 +10,7 @@ export default function HomePage() {
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center">
-            <CircleIcon className="h-6 w-6 text-blue-500" />
+            <Circle className="h-6 w-6 text-blue-500" />
             <span className="ml-2 text-xl font-semibold text-gray-900">InsightTrader</span>
           </Link>
           <nav className="flex items-center space-x-6">
@@ -208,7 +208,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
-              <CircleIcon className="h-6 w-6 text-blue-500" />
+              <Circle className="h-6 w-6 text-blue-500" />
               <span className="ml-2 text-xl font-semibold">InsightTrader</span>
             </div>
             <div className="flex space-x-6">
@@ -224,7 +224,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400">
-            <p>&copy; 2024 InsightTrader. All rights reserved.</p>
+            <p>&copy; 2025 InsightTrader. All rights reserved.</p>
           </div>
         </div>
       </footer>

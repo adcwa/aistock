@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CircleIcon, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp, ArrowRight } from 'lucide-react';
+import { Circle, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp, ArrowRight } from 'lucide-react';
 import { signIn } from './actions';
 import { ActionState } from '@/lib/auth/middleware';
 import { useState } from 'react';
@@ -106,10 +106,10 @@ export function SignInForm() {
 
             {state?.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-600 text-sm flex items-center gap-2">
-                  <CircleIcon className="h-4 w-4" />
-                  {state.error}
-                </p>
+                                           <p className="text-red-600 text-sm flex items-center gap-2">
+                             <Circle className="h-4 w-4" />
+                             {state.error}
+                           </p>
               </div>
             )}
 
@@ -169,9 +169,9 @@ export function SignInForm() {
                 <span className="text-sm text-gray-700">AI驱动的股票分析</span>
               </div>
               <div className="flex items-center gap-3">
-                <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
-                  <CircleIcon className="h-3 w-3 text-blue-600" />
-                </div>
+                                         <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
+                           <Circle className="h-3 w-3 text-blue-600" />
+                         </div>
                 <span className="text-sm text-gray-700">实时市场数据</span>
               </div>
               <div className="flex items-center gap-3">

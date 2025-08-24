@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CircleIcon, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp } from 'lucide-react';
+import { Circle, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp } from 'lucide-react';
 import { signIn, signUp } from './actions';
 import { ActionState } from '@/lib/auth/middleware';
 import { useState } from 'react';
@@ -118,10 +118,10 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
 
             {state?.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-600 text-sm flex items-center gap-2">
-                  <CircleIcon className="h-4 w-4" />
-                  {state.error}
-                </p>
+                                           <p className="text-red-600 text-sm flex items-center gap-2">
+                             <Circle className="h-4 w-4" />
+                             {state.error}
+                           </p>
               </div>
             )}
 
@@ -178,7 +178,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           </div>
           <div className="text-center">
             <div className="mx-auto h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-              <CircleIcon className="h-4 w-4 text-blue-600" />
+              <Circle className="h-4 w-4 text-blue-600" />
             </div>
             <p className="text-xs text-gray-600">实时数据</p>
           </div>

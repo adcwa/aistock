@@ -6,7 +6,10 @@ import { SWRConfig } from 'swr';
 
 export const metadata: Metadata = {
   title: 'AI Stock',
-  description: 'AI Stock is a platform for stock analysis and trading.'
+  description: 'AI Stock is a platform for stock analysis and trading.',
+  icons: {
+    icon: '/icon.svg'
+  }
 };
 
 export const viewport: Viewport = {
