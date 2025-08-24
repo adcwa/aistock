@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { searchHistory } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,8 +48,7 @@ export async function POST(request: NextRequest) {
     const existingRecord = await db
       .select()
       .from(searchHistory)
-      .where(eq(searchHistory.userId, userId))
-      .where(eq(searchHistory.symbol, symbol))
+      .where(and(eq(searchHistory.userId, userId), eq(searchHistory.symbol, symbol)))
       .limit(1);
 
     if (existingRecord.length > 0) {
@@ -98,8 +97,7 @@ export async function DELETE(request: NextRequest) {
       // 删除特定的搜索记录
       const deletedRecord = await db
         .delete(searchHistory)
-        .where(eq(searchHistory.id, recordId))
-        .where(eq(searchHistory.userId, userId))
+        .where(and(eq(searchHistory.id, recordId), eq(searchHistory.userId, userId)))
         .returning();
 
       if (deletedRecord.length === 0) {

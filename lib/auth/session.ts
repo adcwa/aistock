@@ -51,14 +51,16 @@ export async function verifyToken(input: string) {
       algorithms: ['HS256'],
     });
     
+    const sessionData = payload as SessionData;
+    
     logger.debug('Token verified successfully', { 
       action: 'verifyToken',
-      hasUser: !!payload?.user,
-      userId: payload?.user?.id,
-      expires: payload?.expires
+      hasUser: !!sessionData?.user,
+      userId: sessionData?.user?.id,
+      expires: sessionData?.expires
     });
     
-    return payload as SessionData;
+    return sessionData;
   } catch (error) {
     logger.error('Token verification failed', error as Error, { 
       action: 'verifyToken',
@@ -82,7 +84,7 @@ export async function setSession(user: NewUser) {
     });
 
     if (!user.id) {
-      logger.error('Cannot set session - user ID is null/undefined', null, { 
+      logger.error('Cannot set session - user ID is null/undefined', new Error('User ID is required'), { 
         action: 'setSession',
         user: JSON.stringify(user)
       });

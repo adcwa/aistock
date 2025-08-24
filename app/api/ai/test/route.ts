@@ -26,25 +26,50 @@ export async function POST(request: NextRequest) {
     // 测试AI连接
     const testAnalysis = await aiService.analyzeStock({
       symbol: 'AAPL',
-      technicalData: {
-        rsi: 50,
+      currentPrice: 150.25,
+      priceHistory: [
+        {
+          date: '2024-01-01',
+          open: 148.0,
+          high: 152.0,
+          low: 147.5,
+          close: 150.25,
+          volume: 1000000,
+        }
+      ],
+      technicalIndicators: {
+        rsi14: 50,
         macd: 0.1,
-        sma20: 150,
         sma50: 148,
+        sma200: 145,
         bbUpper: 155,
         bbLower: 145,
-        volume: 1000000,
+        bbMiddle: 150,
       },
       fundamentalData: {
-        peRatio: 25,
-        pbRatio: 3,
+        reportDate: new Date('2024-01-01'),
+        year: 2024,
+        pe: 25,
+        pb: 3,
         roe: 15,
         debtToEquity: 0.5,
-        profitMargin: 20,
-        revenueGrowth: 10,
-        earningsGrowth: 12,
+        revenue: 394328000000,
+        netIncome: 96995000000,
+        eps: 6.16,
       },
-      newsData: [],
+      marketContext: {
+        sector: 'Technology',
+        industry: 'Consumer Electronics',
+        marketCap: 2500000000000,
+        peRatio: 25,
+        beta: 1.2,
+      },
+      newsSentiment: {
+        positive: 0.6,
+        negative: 0.2,
+        neutral: 0.2,
+        recentHeadlines: ['Apple Reports Strong Q4 Earnings'],
+      },
     });
 
     return NextResponse.json({

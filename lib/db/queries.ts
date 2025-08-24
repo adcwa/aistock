@@ -9,6 +9,12 @@ export async function getUser() {
   try {
     logger.debug('Getting user from session', { action: 'getUser' });
     
+    // 检查是否在服务器端渲染环境
+    if (typeof window !== 'undefined') {
+      logger.debug('getUser called in client-side environment', { action: 'getUser' });
+      return null;
+    }
+    
     const sessionCookie = (await cookies()).get('session');
     if (!sessionCookie || !sessionCookie.value) {
       logger.debug('No session cookie found', { action: 'getUser' });
@@ -79,6 +85,12 @@ export async function getUser() {
 
     return user[0];
   } catch (error) {
+    // 如果是 PPR 相关的错误，直接返回 null 而不是抛出错误
+    if (error instanceof Error && error.message.includes('prerendering')) {
+      logger.debug('PPR prerendering detected, returning null', { action: 'getUser' });
+      return null;
+    }
+    
     logger.dbError('SELECT', 'users', error as Error, { action: 'getUser' });
     throw error;
   }

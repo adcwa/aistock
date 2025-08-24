@@ -71,7 +71,7 @@ export class AlphaVantageService {
       companyName: data.Name,
       sector: data.Sector,
       industry: data.Industry,
-      marketCap: isNaN(marketCap) ? undefined : marketCap,
+      marketCap: marketCap && !isNaN(marketCap) ? marketCap : undefined,
     };
   }
 
@@ -186,7 +186,8 @@ export class AlphaVantageService {
             operatingCashFlow: cashFlowReport ? this.parseBigInt(cashFlowReport.operatingCashflow) : undefined,
             investingCashFlow: cashFlowReport ? this.parseBigInt(cashFlowReport.cashflowFromInvestment) : undefined,
             financingCashFlow: cashFlowReport ? this.parseBigInt(cashFlowReport.cashflowFromFinancing) : undefined,
-            freeCashFlow: cashFlowReport ? this.parseBigInt(cashFlowReport.operatingCashflow) - this.parseBigInt(cashFlowReport.capitalExpenditures) : undefined,
+            freeCashFlow: cashFlowReport ? 
+              (this.parseBigInt(cashFlowReport.operatingCashflow) || 0) - (this.parseBigInt(cashFlowReport.capitalExpenditures) || 0) : undefined,
             // 其他指标
             sharesOutstanding: overviewData.SharesOutstanding ? parseInt(overviewData.SharesOutstanding) : undefined,
             marketCap: overviewData.MarketCapitalization ? parseInt(overviewData.MarketCapitalization) : undefined,
@@ -246,7 +247,7 @@ export class AlphaVantageService {
         reportDate: new Date(earning.fiscalDateEnding),
         quarter: earning.fiscalDateEnding.includes('Q') ? earning.fiscalDateEnding : undefined,
         year: new Date(earning.fiscalDateEnding).getFullYear(),
-        eps: isNaN(eps) ? undefined : eps,
+        eps: eps && !isNaN(eps) ? eps : undefined,
       };
     });
   }

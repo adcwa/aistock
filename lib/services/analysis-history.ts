@@ -178,7 +178,7 @@ export class AnalysisHistoryService {
     const recommendationsWithAccuracy = histories.filter(h => 
       h.accuracy && parseFloat(h.accuracy) >= 0 && parseFloat(h.accuracy) <= 1
     );
-    const correctPredictions = recommendationsWithAccuracy.filter(h => parseFloat(h.accuracy) >= 0.6).length;
+    const correctPredictions = recommendationsWithAccuracy.filter(h => h.accuracy && parseFloat(h.accuracy) >= 0.6).length;
     const averageConfidence = histories.reduce((sum, h) => sum + parseFloat(h.confidence), 0) / totalAnalyses || 0;
 
     const byRecommendation = {
@@ -191,7 +191,7 @@ export class AnalysisHistoryService {
       const rec = h.recommendation.toLowerCase();
       if (rec in byRecommendation) {
         byRecommendation[rec as keyof typeof byRecommendation].total++;
-        if (parseFloat(h.accuracy) >= 0.6) {
+        if (h.accuracy && parseFloat(h.accuracy) >= 0.6) {
           byRecommendation[rec as keyof typeof byRecommendation].correct++;
         }
       }

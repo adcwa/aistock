@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { stocks, stockPrices, fundamentals, technicalIndicators, recommendations } from '@/lib/db/schema';
-import { getUser } from '@/lib/db/queries';
 import { AlphaVantageService } from '@/lib/services/alpha-vantage';
 import { TechnicalAnalysisEngine } from '@/lib/analysis/technical';
 import { FundamentalAnalysisEngine } from '@/lib/analysis/fundamental';
 import { RecommendationEngine } from '@/lib/analysis/recommendation';
 import { AIAnalysisService } from '@/lib/services/ai-analysis';
 import { AnalysisHistoryService } from '@/lib/services/analysis-history';
-import { PricePredictionService } from '@/lib/services/price-prediction';
+
 import { eq, desc, and } from 'drizzle-orm';
 
 const alphaVantageService = new AlphaVantageService();
@@ -17,7 +16,17 @@ const fundamentalEngine = new FundamentalAnalysisEngine();
 const recommendationEngine = new RecommendationEngine();
 const aiAnalysisService = new AIAnalysisService();
 const analysisHistoryService = new AnalysisHistoryService();
-const pricePredictionService = new PricePredictionService();
+
+// 动态导入 getUser 函数以避免 PPR 问题
+async function getUserSafely() {
+  try {
+    const { getUser } = await import('@/lib/db/queries');
+    return await getUser();
+  } catch (error) {
+    console.error('Failed to get user:', error);
+    return null;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -229,18 +238,8 @@ export async function GET(
     const overallScore = recommendationEngine.calculateOverallScore(analysisScores);
     const recommendation = recommendationEngine.generateRecommendation(overallScore);
 
-    // 生成价格预测
+    // 生成价格预测（暂时禁用）
     let pricePrediction = null;
-    if (currentPrice > 0) {
-      pricePrediction = pricePredictionService.predictPrice({
-        currentPrice,
-        technicalIndicators,
-        financialRatios,
-        recommendation: recommendation.recommendation,
-        confidence: recommendation.confidence,
-        marketTrend: aiAnalysis.sentiment === 'bullish' ? 'bullish' : aiAnalysis.sentiment === 'bearish' ? 'bearish' : 'neutral',
-      });
-    }
 
     // 保存推荐到数据库
     await db.insert(recommendations).values({
@@ -254,9 +253,9 @@ export async function GET(
       macroScore: recommendation.scores.macro.toString(),
     });
 
-    // 保存分析历史（如果有用户ID）
+    // 保存分析历史（如果有用户ID）- 使用安全的 getUser 调用
     try {
-      const user = await getUser();
+      const user = await getUserSafely();
       if (user) {
         await analysisHistoryService.saveAnalysis({
           userId: user.id,
@@ -272,15 +271,13 @@ export async function GET(
           aiSentiment: aiAnalysis.sentiment,
           aiConfidence: aiAnalysis.confidence,
           aiReasoning: aiAnalysis.reasoning,
-          predictedPrice: pricePrediction?.predictedPrice,
+          predictedPrice: undefined,
         });
       }
     } catch (error) {
       console.error('Failed to save analysis history:', error);
       // 不阻止分析完成，只记录错误
     }
-
-
 
     return NextResponse.json({
       stock: stock[0],
@@ -308,16 +305,7 @@ export async function GET(
           summary: recommendationEngine.getRecommendationSummary(recommendation),
           riskWarning: recommendationEngine.getRiskWarning(recommendation),
         },
-        pricePrediction: pricePrediction ? {
-          predictedPrice: pricePrediction.predictedPrice,
-          confidence: pricePrediction.confidence,
-          timeFrame: pricePrediction.timeFrame,
-          reasoning: pricePrediction.reasoning,
-          riskFactors: pricePrediction.riskFactors,
-          currentPrice,
-          priceChange: pricePrediction.predictedPrice - currentPrice,
-          priceChangePercent: ((pricePrediction.predictedPrice - currentPrice) / currentPrice) * 100,
-        } : null,
+        pricePrediction: null,
         scores: analysisScores,
         overallScore: overallScore.score,
         confidence: overallScore.confidence,

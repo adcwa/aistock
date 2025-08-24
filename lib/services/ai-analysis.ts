@@ -2,9 +2,33 @@ import OpenAI from 'openai';
 import { TechnicalIndicators } from '@/lib/analysis/technical';
 import type { FundamentalData } from '@/lib/services/data-sources';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// AI配置接口
+export interface AIConfig {
+  baseUrl?: string;
+  apiKey?: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+// 默认AI配置
+const defaultAIConfig: AIConfig = {
+  baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+  apiKey: process.env.OPENAI_API_KEY || '',
+  model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+  maxTokens: 2000,
+  temperature: 0.3,
+};
+
+// 创建OpenAI客户端
+function createOpenAIClient(config: AIConfig = {}) {
+  const finalConfig = { ...defaultAIConfig, ...config };
+  
+  return new OpenAI({
+    apiKey: finalConfig.apiKey,
+    baseURL: finalConfig.baseUrl,
+  });
+}
 
 export interface AIAnalysisRequest {
   symbol: string;
@@ -88,6 +112,14 @@ export interface PricePrediction {
 }
 
 export class AIAnalysisService {
+  private openai: OpenAI;
+  private config: AIConfig;
+
+  constructor(config: AIConfig = {}) {
+    this.config = { ...defaultAIConfig, ...config };
+    this.openai = createOpenAIClient(this.config);
+  }
+
   /**
    * 执行综合AI分析
    */
@@ -95,8 +127,8 @@ export class AIAnalysisService {
     try {
       const prompt = this.buildAnalysisPrompt(request);
       
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model!,
         messages: [
           {
             role: 'system',
@@ -107,8 +139,8 @@ export class AIAnalysisService {
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        temperature: this.config.temperature,
+        max_tokens: this.config.maxTokens,
       });
 
       const analysis = response.choices[0]?.message?.content;
@@ -130,8 +162,8 @@ export class AIAnalysisService {
     try {
       const prompt = this.buildPredictionPrompt(request);
       
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model!,
         messages: [
           {
             role: 'system',
@@ -161,7 +193,7 @@ export class AIAnalysisService {
   /**
    * 生成市场情绪分析
    */
-  async analyzeMarketSentiment(symbol: string, newsData: any[]): Promise<{
+  async analyzeNewsSentiment(symbol: string, newsData: any[]): Promise<{
     sentiment: 'positive' | 'negative' | 'neutral';
     confidence: number;
     keyTopics: string[];
@@ -169,35 +201,33 @@ export class AIAnalysisService {
     summary: string;
   }> {
     try {
-      const newsText = newsData.map(news => `${news.title}: ${news.summary}`).join('\n');
+      const prompt = this.buildSentimentPrompt(symbol, newsData);
       
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+      const response = await this.openai.chat.completions.create({
+        model: this.config.model!,
         messages: [
           {
             role: 'system',
-            content: `分析以下关于${symbol}的新闻，评估市场情绪。`
+            content: `你是一个专业的市场情绪分析师。基于新闻数据，分析股票的市场情绪和投资者信心。`
           },
           {
             role: 'user',
-            content: `请分析以下新闻的市场情绪：\n\n${newsText}`
+            content: prompt
           }
         ],
         temperature: 0.3,
         max_tokens: 1000,
       });
 
-      const analysis = response.choices[0]?.message?.content;
-      return this.parseSentimentAnalysis(analysis || '');
+      const sentiment = response.choices[0]?.message?.content;
+      if (!sentiment) {
+        throw new Error('情绪分析失败');
+      }
+
+      return this.parseSentimentResult(sentiment);
     } catch (error) {
       console.error('情绪分析错误:', error);
-      return {
-        sentiment: 'neutral',
-        confidence: 0.5,
-        keyTopics: [],
-        sentimentTrend: 'stable',
-        summary: '无法分析市场情绪'
-      };
+      return this.generateFallbackSentiment();
     }
   }
 
@@ -385,6 +415,75 @@ export class AIAnalysisService {
         bearish: predictedPrice * 0.9,
         base: predictedPrice
       }
+    };
+  }
+
+  /**
+   * 构建情绪分析提示
+   */
+  private buildSentimentPrompt(symbol: string, newsData: any[]): string {
+    const newsText = newsData.map(news => `${news.title}: ${news.summary || ''}`).join('\n');
+    
+    return `请分析以下关于${symbol}的新闻，评估市场情绪：
+
+新闻数据：
+${newsText}
+
+请提供：
+1. 整体情绪评估（positive/negative/neutral）
+2. 信心度（0-1）
+3. 关键话题
+4. 情绪趋势
+5. 简要总结`;
+  }
+
+  /**
+   * 解析情绪分析结果
+   */
+  private parseSentimentResult(analysis: string): {
+    sentiment: 'positive' | 'negative' | 'neutral';
+    confidence: number;
+    keyTopics: string[];
+    sentimentTrend: 'improving' | 'deteriorating' | 'stable';
+    summary: string;
+  } {
+    let sentiment: 'positive' | 'negative' | 'neutral' = 'neutral';
+    let confidence = 0.5;
+    let keyTopics: string[] = [];
+    let sentimentTrend: 'improving' | 'deteriorating' | 'stable' = 'stable';
+    let summary = '';
+
+    if (analysis.toLowerCase().includes('positive') || analysis.toLowerCase().includes('积极')) {
+      sentiment = 'positive';
+    } else if (analysis.toLowerCase().includes('negative') || analysis.toLowerCase().includes('消极')) {
+      sentiment = 'negative';
+    }
+
+    return {
+      sentiment,
+      confidence,
+      keyTopics,
+      sentimentTrend,
+      summary: analysis.substring(0, 200) + '...'
+    };
+  }
+
+  /**
+   * 生成备用情绪分析
+   */
+  private generateFallbackSentiment(): {
+    sentiment: 'positive' | 'negative' | 'neutral';
+    confidence: number;
+    keyTopics: string[];
+    sentimentTrend: 'improving' | 'deteriorating' | 'stable';
+    summary: string;
+  } {
+    return {
+      sentiment: 'neutral',
+      confidence: 0.5,
+      keyTopics: [],
+      sentimentTrend: 'stable',
+      summary: '无法分析市场情绪'
     };
   }
 
