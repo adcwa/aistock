@@ -17,6 +17,32 @@ const recommendationEngine = new RecommendationEngine();
 const aiAnalysisService = new AIAnalysisService();
 const analysisHistoryService = new AnalysisHistoryService();
 
+// 日志记录器
+class AnalysisLogger {
+  private logs: string[] = [];
+  private startTime: number;
+
+  constructor() {
+    this.startTime = Date.now();
+  }
+
+  log(message: string) {
+    const timestamp = new Date().toISOString();
+    const elapsed = Date.now() - this.startTime;
+    const logEntry = `[${timestamp}] [${elapsed}ms] ${message}`;
+    console.log(logEntry);
+    this.logs.push(logEntry);
+  }
+
+  getLogs() {
+    return this.logs;
+  }
+
+  getElapsedTime() {
+    return Date.now() - this.startTime;
+  }
+}
+
 // 动态导入 getUser 函数以避免 PPR 问题
 async function getUserSafely() {
   try {
@@ -28,19 +54,38 @@ async function getUserSafely() {
   }
 }
 
+// 超时检查函数
+function checkTimeout(startTime: number, maxTimeout: number = 25000) {
+  const elapsed = Date.now() - startTime;
+  if (elapsed > maxTimeout) {
+    throw new Error(`Analysis timeout after ${elapsed}ms`);
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ symbol: string }> }
 ) {
+  const logger = new AnalysisLogger();
+  const startTime = Date.now();
+  
   try {
+    logger.log('开始股票分析请求');
+    
     const { symbol } = await params;
     const symbolUpper = symbol.toUpperCase();
+    logger.log(`分析股票: ${symbolUpper}`);
     
     // 获取查询参数
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('force') === 'true';
+    logger.log(`强制刷新: ${forceRefresh}`);
+
+    // 检查超时
+    checkTimeout(startTime);
 
     // 获取股票信息
+    logger.log('获取股票基本信息');
     const stock = await db
       .select()
       .from(stocks)
@@ -48,6 +93,7 @@ export async function GET(
       .limit(1);
 
     if (stock.length === 0) {
+      logger.log(`股票未找到: ${symbolUpper}`);
       return NextResponse.json(
         { error: 'Stock not found' },
         { status: 404 }
@@ -55,9 +101,12 @@ export async function GET(
     }
 
     const stockId = stock[0].id;
+    logger.log(`股票ID: ${stockId}`);
 
-        // 检查是否有今天的分析结果（如果不强制刷新）
+    // 检查是否有今天的分析结果（如果不强制刷新）
     if (!forceRefresh) {
+      logger.log('检查缓存的分析结果');
+      
       // 获取用户信息
       const user = await getUserSafely();
       
@@ -77,6 +126,7 @@ export async function GET(
           .limit(1);
 
         if (existingAnalysis.length > 0) {
+          logger.log('找到缓存的分析结果，直接返回');
           const cachedAnalysis = existingAnalysis[0];
           
           // 返回缓存的分析结果，使用实际的分析数据
@@ -125,12 +175,18 @@ export async function GET(
             cached: true,
             cachedAt: cachedAnalysis.createdAt,
             analysisHistoryId: cachedAnalysis.id,
+            logs: logger.getLogs(),
+            executionTime: logger.getElapsedTime(),
           });
         }
       }
     }
 
+    // 检查超时
+    checkTimeout(startTime);
+
     // 获取价格数据
+    logger.log('获取价格数据');
     const prices = await db
       .select()
       .from(stockPrices)
@@ -138,7 +194,13 @@ export async function GET(
       .orderBy(desc(stockPrices.timestamp))
       .limit(200); // 获取足够的数据进行技术分析
 
+    logger.log(`从数据库获取到 ${prices.length} 条价格数据`);
+
+    // 检查超时
+    checkTimeout(startTime);
+
     // 获取基本面数据
+    logger.log('获取基本面数据');
     const fundamentalData = await db
       .select()
       .from(fundamentals)
@@ -146,10 +208,14 @@ export async function GET(
       .orderBy(desc(fundamentals.reportDate))
       .limit(10);
 
+    logger.log(`从数据库获取到 ${fundamentalData.length} 条基本面数据`);
+
     // 如果数据不足，从API获取
     if (prices.length < 50) {
+      logger.log('价格数据不足，从API获取补充数据');
       try {
         const apiPrices = await alphaVantageService.getHistoricalPrices(symbolUpper, 'daily');
+        logger.log(`从API获取到 ${apiPrices.length} 条价格数据`);
         
         if (apiPrices.length > 0) {
           const pricesToInsert = apiPrices
@@ -172,6 +238,7 @@ export async function GET(
             }));
 
           if (pricesToInsert.length > 0) {
+            logger.log(`插入 ${pricesToInsert.length} 条价格数据到数据库`);
             await db.insert(stockPrices).values(pricesToInsert);
           }
           
@@ -184,15 +251,22 @@ export async function GET(
             .limit(200);
 
           prices.push(...updatedPrices);
+          logger.log(`更新后总共有 ${prices.length} 条价格数据`);
         }
       } catch (apiError) {
+        logger.log(`API获取价格数据失败: ${apiError}`);
         console.error('Failed to fetch price data from API:', apiError);
       }
     }
 
+    // 检查超时
+    checkTimeout(startTime);
+
     if (fundamentalData.length === 0) {
+      logger.log('基本面数据不足，从API获取补充数据');
       try {
         const apiFundamentals = await alphaVantageService.getFundamentals(symbolUpper);
+        logger.log(`从API获取到 ${apiFundamentals.length} 条基本面数据`);
         
         if (apiFundamentals.length > 0) {
           const fundamentalsToInsert = apiFundamentals
@@ -213,6 +287,7 @@ export async function GET(
             }));
 
           if (fundamentalsToInsert.length > 0) {
+            logger.log(`插入 ${fundamentalsToInsert.length} 条基本面数据到数据库`);
             await db.insert(fundamentals).values(fundamentalsToInsert);
           }
           
@@ -225,17 +300,24 @@ export async function GET(
             .limit(10);
 
           fundamentalData.push(...updatedFundamentals);
+          logger.log(`更新后总共有 ${fundamentalData.length} 条基本面数据`);
         }
       } catch (apiError) {
+        logger.log(`API获取基本面数据失败: ${apiError}`);
         console.error('Failed to fetch fundamental data from API:', apiError);
       }
     }
 
+    // 检查超时
+    checkTimeout(startTime);
+
     // 进行技术分析
+    logger.log('开始技术分析');
     const priceValues = prices.map(p => parseFloat(p.close.toString())).reverse();
     const volumeValues = prices.map(p => p.volume).reverse();
     
     // 计算技术指标
+    logger.log('计算技术指标');
     const sma50 = technicalEngine.calculateSMA(priceValues, 50);
     const sma200 = technicalEngine.calculateSMA(priceValues, 200);
     const rsi14 = technicalEngine.calculateRSI(priceValues, 14);
@@ -258,8 +340,13 @@ export async function GET(
     
     const currentPrice = priceValues.length > 0 ? priceValues[0] : 0;
     const technicalScore = technicalEngine.calculateTechnicalScore(technicalIndicators, currentPrice);
+    logger.log(`技术分析完成，得分: ${technicalScore}`);
+
+    // 检查超时
+    checkTimeout(startTime);
 
     // 进行基本面分析
+    logger.log('开始基本面分析');
     const fundamentalDataConverted = fundamentalData.map(f => ({
       reportDate: f.reportDate,
       quarter: f.quarter || undefined,
@@ -270,8 +357,13 @@ export async function GET(
     }));
     const financialRatios = fundamentalEngine.calculateFinancialRatios(fundamentalDataConverted);
     const fundamentalScore = fundamentalEngine.calculateFundamentalScore(financialRatios);
+    logger.log(`基本面分析完成，得分: ${fundamentalScore}`);
 
-    // AI分析
+    // 检查超时
+    checkTimeout(startTime);
+
+    // AI分析 - 设置较短的超时时间
+    logger.log('开始AI分析');
     const aiAnalysis = await aiAnalysisService.analyzeStock({
       symbol: symbolUpper,
       currentPrice,
@@ -297,6 +389,10 @@ export async function GET(
         recentHeadlines: [],
       },
     });
+    logger.log(`AI分析完成，情绪: ${aiAnalysis.sentiment}`);
+
+    // 检查超时
+    checkTimeout(startTime);
 
     // 使用AI分析结果
     const sentimentScore = aiAnalysis.sentiment === 'bullish' ? 0.8 : 
@@ -306,6 +402,7 @@ export async function GET(
     const macroScore = 0.5;
 
     // 生成推荐
+    logger.log('生成投资推荐');
     const analysisScores = {
       technical: technicalScore,
       fundamental: fundamentalScore,
@@ -315,11 +412,13 @@ export async function GET(
 
     const overallScore = recommendationEngine.calculateOverallScore(analysisScores);
     const recommendation = recommendationEngine.generateRecommendation(overallScore);
+    logger.log(`推荐生成完成: ${recommendation.recommendation}`);
 
-    // 生成价格预测（暂时禁用）
-    let pricePrediction = null;
+    // 检查超时
+    checkTimeout(startTime);
 
     // 保存推荐到数据库
+    logger.log('保存推荐到数据库');
     await db.insert(recommendations).values({
       stockId,
       recommendation: recommendation.recommendation,
@@ -335,6 +434,7 @@ export async function GET(
     try {
       const user = await getUserSafely();
       if (user) {
+        logger.log('保存分析历史');
         await analysisHistoryService.saveAnalysis({
           userId: user.id,
           stockId,
@@ -353,9 +453,12 @@ export async function GET(
         });
       }
     } catch (error) {
+      logger.log(`保存分析历史失败: ${error}`);
       console.error('Failed to save analysis history:', error);
       // 不阻止分析完成，只记录错误
     }
+
+    logger.log('分析完成，准备返回结果');
 
     return NextResponse.json({
       stock: stock[0],
@@ -392,12 +495,22 @@ export async function GET(
         prices: prices.length,
         fundamentals: fundamentalData.length,
       },
+      logs: logger.getLogs(),
+      executionTime: logger.getElapsedTime(),
     });
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.log(`分析过程中发生错误: ${errorMessage}`);
     console.error('Stock analysis error:', error);
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: errorMessage,
+        logs: logger.getLogs(),
+        executionTime: logger.getElapsedTime(),
+      },
       { status: 500 }
     );
   }

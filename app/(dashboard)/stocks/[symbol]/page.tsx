@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowUp, ArrowDown, TrendingUp, TrendingDown, Minus, BarChart3, Target, Brain, History, Clock, RefreshCw, Circle } from 'lucide-react';
 import AdvancedStockChart from '@/components/charts/AdvancedStockChart';
 import BacktestingPanel from '@/components/backtesting/BacktestingPanel';
+import { AnalysisProgress } from '@/components/ui/analysis-progress';
 
 interface Stock {
   id: number;
@@ -111,12 +112,15 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showAnalysisProgress, setShowAnalysisProgress] = useState(false);
+  const [currentSymbol, setCurrentSymbol] = useState<string>('');
 
   useEffect(() => {
     let isMounted = true;
     
     params.then(({ symbol }) => {
       if (isMounted) {
+        setCurrentSymbol(symbol);
         loadStockAnalysis(symbol);
         // 记录搜索历史
         recordSearchHistory(symbol);
@@ -181,7 +185,20 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
   };
 
   const handleRefreshAnalysis = () => {
-    params.then(({ symbol }) => loadStockAnalysis(symbol, true));
+    setShowAnalysisProgress(true);
+  };
+
+  const handleAnalysisComplete = (data: any) => {
+    setAnalysisData(data);
+    setShowAnalysisProgress(false);
+    setLoading(false);
+    setError(null);
+  };
+
+  const handleAnalysisError = (errorMessage: string) => {
+    setError(errorMessage);
+    setShowAnalysisProgress(false);
+    setLoading(false);
   };
 
 
@@ -234,7 +251,7 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
     return `$${marketCap.toLocaleString()}`;
   };
 
-  if (loading) {
+  if (loading && !showAnalysisProgress) {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center py-12">
@@ -248,6 +265,18 @@ export default function StockDetailPage({ params }: { params: Promise<{ symbol: 
           </div>
           <p className="mt-4 text-gray-600">正在加载股票分析数据...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (showAnalysisProgress && currentSymbol) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <AnalysisProgress 
+          symbol={currentSymbol}
+          onComplete={handleAnalysisComplete}
+          onError={handleAnalysisError}
+        />
       </div>
     );
   }
