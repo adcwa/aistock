@@ -6,10 +6,12 @@ import { AIAnalysisService } from '@/lib/services/ai-analysis';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+  let session;
   try {
-    const session = await getSession();
+    session = await getSession();
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
@@ -17,7 +19,7 @@ export async function POST(
     // 检查用户是否有自定义AI配置权限
     await SubscriptionService.checkAndThrowLimit(session.user.id, 'customAIConfig');
 
-    const configId = parseInt(params.id);
+    const configId = parseInt(id);
     if (isNaN(configId)) {
       return NextResponse.json({ error: '无效的配置ID' }, { status: 400 });
     }
@@ -32,11 +34,11 @@ export async function POST(
 
     // 创建AI分析服务实例
     const aiService = new AIAnalysisService({
-      baseUrl: config.baseUrl,
-      apiKey: config.apiKey,
-      model: config.model,
-      maxTokens: config.maxTokens,
-      temperature: config.temperature
+      baseUrl: config.baseUrl || '',
+      apiKey: config.apiKey || '',
+      model: config.model || '',
+      maxTokens: config.maxTokens || 1000,
+      temperature: parseFloat(config.temperature || '0.7')
     });
 
     const startTime = Date.now();
@@ -98,7 +100,7 @@ export async function POST(
       configId: config.id,
       stockSymbol: 'AAPL',
       tokensUsed: 1000, // 估算值
-      cost: 0.002, // 估算值
+      cost: '0.002', // 估算值
       responseTime,
       success: true,
       errorMessage: null
@@ -125,14 +127,14 @@ export async function POST(
     
     // 记录失败的使用情况
     try {
-      const configId = parseInt(params.id);
+      const configId = parseInt(id);
       if (!isNaN(configId)) {
         await AIConfigService.recordUsage({
           userId: session?.user?.id || 0,
           configId,
           stockSymbol: 'AAPL',
           tokensUsed: 0,
-          cost: 0,
+          cost: '0',
           responseTime: 0,
           success: false,
           errorMessage: error instanceof Error ? error.message : 'Unknown error'

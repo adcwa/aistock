@@ -36,6 +36,8 @@ interface User {
   name: string;
   email: string;
   roles: Role[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Permission {

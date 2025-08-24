@@ -6,8 +6,9 @@ import { requireAdmin } from '@/lib/middleware/permission';
 // 获取用户的角色
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId: userIdParam } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -15,7 +16,7 @@ export async function GET(
       return adminCheck;
     }
 
-    const userId = parseInt(params.userId);
+    const userId = parseInt(userIdParam);
     if (isNaN(userId)) {
       return NextResponse.json(
         { error: '无效的用户ID' },
@@ -41,8 +42,9 @@ export async function GET(
 // 为用户分配角色
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId: userIdParam } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -51,7 +53,7 @@ export async function POST(
     }
 
     const session = await getSession();
-    const userId = parseInt(params.userId);
+    const userId = parseInt(userIdParam);
     const { roleId, expiresAt } = await request.json();
 
     if (isNaN(userId)) {
@@ -91,8 +93,9 @@ export async function POST(
 // 移除用户的角色
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId: userIdParam } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -100,7 +103,7 @@ export async function DELETE(
       return adminCheck;
     }
 
-    const userId = parseInt(params.userId);
+    const userId = parseInt(userIdParam);
     const { roleId } = await request.json();
 
     if (isNaN(userId)) {

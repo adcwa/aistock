@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { RoleManagementService } from '@/lib/services/role-management';
 import { requireAdmin } from '@/lib/middleware/permission';
-import { db } from '@/lib/db/schema';
+import { db } from '@/lib/db/drizzle';
 import { roles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 // 获取角色详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -18,7 +19,7 @@ export async function GET(
       return adminCheck;
     }
 
-    const roleId = parseInt(params.id);
+    const roleId = parseInt(id);
     if (isNaN(roleId)) {
       return NextResponse.json(
         { error: '无效的角色ID' },
@@ -55,8 +56,9 @@ export async function GET(
 // 更新角色
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -65,7 +67,7 @@ export async function PUT(
     }
 
     const session = await getSession();
-    const roleId = parseInt(params.id);
+    const roleId = parseInt(id);
     const { name, description, permissions } = await request.json();
 
     if (isNaN(roleId)) {
@@ -97,8 +99,9 @@ export async function PUT(
 // 删除角色
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     // 检查管理员权限
     const adminCheck = await requireAdmin()(request);
@@ -106,7 +109,7 @@ export async function DELETE(
       return adminCheck;
     }
 
-    const roleId = parseInt(params.id);
+    const roleId = parseInt(id);
     if (isNaN(roleId)) {
       return NextResponse.json(
         { error: '无效的角色ID' },

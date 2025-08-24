@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth/session';
 import { EmailNotificationService } from '@/lib/services/email-notification';
 import { SubscriptionService } from '@/lib/services/subscription';
-import { getSession } from '@/lib/auth/session';
 
+// 发送测试邮件
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
@@ -13,13 +14,19 @@ export async function POST(request: NextRequest) {
     // 检查用户是否有邮件通知权限
     await SubscriptionService.checkAndThrowLimit(session.user.id, 'emailNotification');
 
-    // 发送测试邮件
-    await EmailNotificationService.sendTestEmail(session.user.id);
+    const success = await EmailNotificationService.sendTestEmail(session.user.id);
     
-    return NextResponse.json({
-      success: true,
-      message: '测试邮件发送成功，请检查您的邮箱'
-    });
+    if (success) {
+      return NextResponse.json({
+        success: true,
+        message: '测试邮件发送成功'
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: '测试邮件发送失败'
+      });
+    }
   } catch (error) {
     console.error('Failed to send test email:', error);
     

@@ -12,7 +12,7 @@ const updateConfigSchema = z.object({
   apiKey: z.string().min(1, 'API密钥不能为空').optional(),
   model: z.string().min(1, '模型名称不能为空').optional(),
   maxTokens: z.number().min(100, '最大Token数不能少于100').max(4000, '最大Token数不能超过4000').optional(),
-  temperature: z.number().min(0, '温度值不能小于0').max(1, '温度值不能大于1').optional(),
+  temperature: z.string().optional(),
   systemPrompt: z.string().optional(),
   analysisPrompt: z.string().optional(),
   isActive: z.boolean().optional()
@@ -20,8 +20,9 @@ const updateConfigSchema = z.object({
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getSession();
     if (!session?.user?.id) {
@@ -31,7 +32,7 @@ export async function PUT(
     // 检查用户是否有自定义AI配置权限
     await SubscriptionService.checkAndThrowLimit(session.user.id, 'customAIConfig');
 
-    const configId = parseInt(params.id);
+    const configId = parseInt(id);
     if (isNaN(configId)) {
       return NextResponse.json({ error: '无效的配置ID' }, { status: 400 });
     }
@@ -72,8 +73,9 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getSession();
     if (!session?.user?.id) {
@@ -83,7 +85,7 @@ export async function DELETE(
     // 检查用户是否有自定义AI配置权限
     await SubscriptionService.checkAndThrowLimit(session.user.id, 'customAIConfig');
 
-    const configId = parseInt(params.id);
+    const configId = parseInt(id);
     if (isNaN(configId)) {
       return NextResponse.json({ error: '无效的配置ID' }, { status: 400 });
     }

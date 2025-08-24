@@ -4,10 +4,31 @@ import { eq, and, gte, lte } from 'drizzle-orm';
 import { SubscriptionTier, SUBSCRIPTION_LIMITS, type UsageStatus } from '@/lib/types/subscription';
 
 export class SubscriptionService {
-  // 获取用户的订阅级别
+  // 获取用户的订阅级别（基于角色）
   static async getUserTier(userId: number): Promise<SubscriptionTier> {
     try {
-      // 通过用户找到团队，然后获取团队的订阅级别
+      // 首先检查用户角色，角色优先级高于订阅计划
+      const { RoleManagementService } = await import('./role-management');
+      const userRoles = await RoleManagementService.getUserRoles(userId);
+      
+      // 检查是否有admin角色
+      const hasAdminRole = userRoles.some(role => role.name === 'admin');
+      if (hasAdminRole) {
+        return SubscriptionTier.ENTERPRISE; // 管理员拥有最高权限
+      }
+      
+      // 检查其他角色
+      const hasEnterpriseRole = userRoles.some(role => role.name === 'enterprise');
+      if (hasEnterpriseRole) {
+        return SubscriptionTier.ENTERPRISE;
+      }
+      
+      const hasProRole = userRoles.some(role => role.name === 'pro');
+      if (hasProRole) {
+        return SubscriptionTier.PRO;
+      }
+      
+      // 如果没有角色，则回退到订阅计划检查
       const teamMember = await db
         .select({
           teamId: teams.id,
@@ -129,6 +150,13 @@ export class SubscriptionService {
 
   // 检查并抛出限制异常
   static async checkAndThrowLimit(userId: number, action: 'query' | 'aiAnalysis' | 'watchlist' | 'emailNotification' | 'customAIConfig'): Promise<void> {
+    // 首先检查用户是否是管理员，如果是则直接通过
+    const { RoleManagementService } = await import('./role-management');
+    const isAdmin = await RoleManagementService.isAdmin(userId);
+    if (isAdmin) {
+      return; // 管理员拥有所有权限，无需检查订阅限制
+    }
+
     const usageStatus = await this.getUserUsageStatus(userId);
     const limits = usageStatus.limits;
     const tier = usageStatus.tier;
@@ -359,5 +387,82 @@ export class SubscriptionService {
         limits: SUBSCRIPTION_LIMITS[SubscriptionTier.ENTERPRISE]
       }
     ];
+  }
+
+  // 同步用户角色和订阅计划
+  static async syncUserRoleAndSubscription(userId: number, subscriptionTier: SubscriptionTier): Promise<void> {
+    try {
+      const { RoleManagementService } = await import('./role-management');
+      
+      // 获取所有角色
+      const allRoles = await RoleManagementService.getAllRoles();
+      
+      // 根据订阅级别分配角色
+      let targetRoleName: string;
+      switch (subscriptionTier) {
+        case SubscriptionTier.ENTERPRISE:
+          targetRoleName = 'enterprise';
+          break;
+        case SubscriptionTier.PRO:
+          targetRoleName = 'pro';
+          break;
+        case SubscriptionTier.FREE:
+        default:
+          targetRoleName = 'free';
+          break;
+      }
+      
+      // 找到目标角色
+      const targetRole = allRoles.find(role => role.name === targetRoleName);
+      if (!targetRole) {
+        console.error(`Role ${targetRoleName} not found`);
+        return;
+      }
+      
+      // 移除用户的所有现有角色（除了admin）
+      const userRoles = await RoleManagementService.getUserRoles(userId);
+      for (const role of userRoles) {
+        if (role.name !== 'admin') {
+          await RoleManagementService.removeRoleFromUser(userId, role.id);
+        }
+      }
+      
+      // 分配新角色
+      await RoleManagementService.assignRoleToUser(userId, targetRole.id, userId);
+      
+      console.log(`Successfully synced user ${userId} to role ${targetRoleName}`);
+    } catch (error) {
+      console.error('Error syncing user role and subscription:', error);
+    }
+  }
+
+  // 检查用户是否有特定功能的权限（基于角色和订阅）
+  static async hasFeaturePermission(userId: number, feature: 'emailNotification' | 'customAIConfig' | 'advancedFeatures'): Promise<boolean> {
+    try {
+      // 首先检查是否是管理员
+      const { RoleManagementService } = await import('./role-management');
+      const isAdmin = await RoleManagementService.isAdmin(userId);
+      if (isAdmin) {
+        return true; // 管理员拥有所有权限
+      }
+      
+      // 获取用户订阅级别
+      const tier = await this.getUserTier(userId);
+      const limits = SUBSCRIPTION_LIMITS[tier];
+      
+      switch (feature) {
+        case 'emailNotification':
+          return limits.emailNotifications;
+        case 'customAIConfig':
+          return limits.customAIConfig;
+        case 'advancedFeatures':
+          return limits.advancedFeatures;
+        default:
+          return false;
+      }
+    } catch (error) {
+      console.error('Error checking feature permission:', error);
+      return false;
+    }
   }
 }

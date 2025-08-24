@@ -12,7 +12,7 @@ const createConfigSchema = z.object({
   apiKey: z.string().min(1, 'API密钥不能为空'),
   model: z.string().min(1, '模型名称不能为空'),
   maxTokens: z.number().min(100, '最大Token数不能少于100').max(4000, '最大Token数不能超过4000'),
-  temperature: z.number().min(0, '温度值不能小于0').max(1, '温度值不能大于1'),
+  temperature: z.string(),
   systemPrompt: z.string().optional(),
   analysisPrompt: z.string().optional(),
   isActive: z.boolean().optional()

@@ -111,7 +111,7 @@ export class AIConfigService {
     if (userConfig && userConfig.isActive) {
       return {
         ...userConfig,
-        apiKey: userConfig.apiKey ? EncryptionService.decrypt(userConfig.apiKey) : undefined
+        apiKey: userConfig.apiKey ? EncryptionService.decrypt(userConfig.apiKey) : null
       };
     }
 
@@ -122,10 +122,10 @@ export class AIConfigService {
       name: 'System Default',
       isDefault: false,
       baseUrl: SYSTEM_DEFAULT_CONFIG.baseUrl,
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY || null,
       model: SYSTEM_DEFAULT_CONFIG.model,
       maxTokens: SYSTEM_DEFAULT_CONFIG.maxTokens,
-      temperature: SYSTEM_DEFAULT_CONFIG.temperature,
+      temperature: SYSTEM_DEFAULT_CONFIG.temperature.toString(),
       systemPrompt: SYSTEM_DEFAULT_CONFIG.systemPrompt,
       analysisPrompt: SYSTEM_DEFAULT_CONFIG.analysisPrompt,
       isActive: true,
@@ -207,7 +207,7 @@ export class AIConfigService {
       .delete(aiConfigs)
       .where(and(eq(aiConfigs.id, configId), eq(aiConfigs.userId, userId)));
 
-    if (result.rowCount === 0) {
+    if (result.length === 0) {
       throw new Error('AI配置不存在或无权限删除');
     }
   }
