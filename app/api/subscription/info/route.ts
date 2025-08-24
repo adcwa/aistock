@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createCheckoutSession } from '@/lib/payments/stripe';
 import { getSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/drizzle';
 import { teams, teamMembers } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { stripe } from '@/lib/payments/stripe';
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
-    }
-
-    const { planId, successUrl, cancelUrl } = await request.json();
-
-    if (!planId || !successUrl || !cancelUrl) {
-      return NextResponse.json(
-        { error: '缺少必要参数' },
-        { status: 400 }
-      );
     }
 
     // 获取用户的团队
@@ -42,23 +33,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const teamId = userTeam[0].teamId;
+    const team = userTeam[0].team;
 
-    // 创建结账会话
-    const checkoutSession = await createCheckoutSession(
-      teamId,
-      planId,
-      successUrl,
-      cancelUrl
-    );
+    // 如果没有订阅，返回基本信息
+    if (!team.stripeSubscriptionId) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: null,
+          status: 'free',
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          cancelAtPeriodEnd: false,
+          planName: 'Free',
+          tier: 'free'
+        }
+      });
+    }
+
+    // 获取Stripe订阅信息
+    const subscription = await stripe.subscriptions.retrieve(team.stripeSubscriptionId);
 
     return NextResponse.json({
       success: true,
-      url: checkoutSession.url
+      data: {
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000).toISOString(),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        planName: team.planName || 'Unknown',
+        tier: team.planName?.toLowerCase() || 'free'
+      }
     });
 
   } catch (error) {
-    console.error('Checkout error:', error);
+    console.error('Subscription info error:', error);
     
     if (error instanceof Error) {
       return NextResponse.json(
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: '创建结账会话失败' },
+      { error: '获取订阅信息失败' },
       { status: 500 }
     );
   }

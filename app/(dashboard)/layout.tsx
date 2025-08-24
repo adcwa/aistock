@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { Circle } from 'lucide-react';
 import { UserMenu } from './user-menu';
+import { PermissionLink } from '@/components/auth/permission-guard';
 
 function Header() {
   return (
@@ -21,12 +22,19 @@ function Header() {
           <Link href="/ai-config" className="text-sm font-medium text-gray-700 hover:text-gray-900">
             AI Config
           </Link>
-          <Link href="/ai-prompt" className="text-sm font-medium text-gray-700 hover:text-gray-900">
-            AI Prompt
+          <Link href="/notifications" className="text-sm font-medium text-gray-700 hover:text-gray-900">
+            Notifications
           </Link>
-          <Link href="/pricing" className="text-sm font-medium text-gray-700 hover:text-gray-900">
-            Pricing
+          <Link href="/subscription" className="text-sm font-medium text-gray-700 hover:text-gray-900">
+            Subscription
           </Link>
+          <PermissionLink 
+            href="/admin" 
+            permission="role:view"
+            className="text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            Admin
+          </PermissionLink>
         </nav>
         <div className="flex items-center space-x-4">
           <Suspense fallback={<div className="h-9" />}>

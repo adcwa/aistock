@@ -9,6 +9,8 @@ import {
   bigint,
   boolean,
   json,
+  time,
+  date,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -245,18 +247,171 @@ export const searchHistory = pgTable('search_history', {
   searchedAt: timestamp('searched_at').notNull().defaultNow(),
 });
 
+// AI配置表
+export const aiConfigs = pgTable('ai_configs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 100 }).notNull(),
+  isDefault: boolean('is_default').default(false),
+  baseUrl: varchar('base_url', { length: 255 }).notNull().default('https://api.openai.com/v1'),
+  apiKey: varchar('api_key', { length: 255 }), // 加密存储
+  model: varchar('model', { length: 50 }).notNull().default('gpt-4o-mini'),
+  maxTokens: integer('max_tokens').notNull().default(1000),
+  temperature: decimal('temperature', { precision: 3, scale: 2 }).notNull().default('0.30'),
+  systemPrompt: text('system_prompt'), // 自定义系统提示词
+  analysisPrompt: text('analysis_prompt'), // 自定义分析提示词
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// AI配置使用记录表
+export const aiConfigUsage = pgTable('ai_config_usage', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  configId: integer('config_id')
+    .notNull()
+    .references(() => aiConfigs.id, { onDelete: 'cascade' }),
+  stockSymbol: varchar('stock_symbol', { length: 10 }).notNull(),
+  tokensUsed: integer('tokens_used'),
+  cost: decimal('cost', { precision: 10, scale: 4 }),
+  responseTime: integer('response_time'), // 毫秒
+  success: boolean('success').notNull(),
+  errorMessage: text('error_message'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 邮件通知配置表
+export const emailNotifications = pgTable('email_notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }).notNull(),
+  isEnabled: boolean('is_enabled').default(true),
+  morningTime: time('morning_time').default('09:00:00'),
+  eveningTime: time('evening_time').default('18:00:00'),
+  timezone: varchar('timezone', { length: 50 }).default('Asia/Shanghai'),
+  includeWatchlist: boolean('include_watchlist').default(true),
+  includeAnalysis: boolean('include_analysis').default(true),
+  includeAlerts: boolean('include_alerts').default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 邮件发送记录表
+export const emailLogs = pgTable('email_logs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }).notNull(),
+  subject: varchar('subject', { length: 255 }).notNull(),
+  templateName: varchar('template_name', { length: 100 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull(), // 'sent', 'failed', 'pending'
+  errorMessage: text('error_message'),
+  sentAt: timestamp('sent_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+// 用户使用量跟踪表
+export const usageTracking = pgTable('usage_tracking', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  date: date('date').notNull(),
+  queriesUsed: integer('queries_used').default(0),
+  aiAnalysisUsed: integer('ai_analysis_used').default(0),
+  watchlistCount: integer('watchlist_count').default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 角色表
+export const roles = pgTable('roles', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 50 }).notNull().unique(),
+  description: text('description'),
+  permissions: json('permissions').$type<string[]>(),
+  isSystem: boolean('is_system').default(false), // 是否为系统内置角色
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 用户角色关联表
+export const userRoles = pgTable('user_roles', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  roleId: integer('role_id')
+    .notNull()
+    .references(() => roles.id, { onDelete: 'cascade' }),
+  assignedBy: integer('assigned_by')
+    .references(() => users.id),
+  assignedAt: timestamp('assigned_at').notNull().defaultNow(),
+  expiresAt: timestamp('expires_at'), // 角色过期时间
+});
+
+// 权限表
+export const permissions = pgTable('permissions', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 100 }).notNull().unique(),
+  description: text('description'),
+  resource: varchar('resource', { length: 100 }).notNull(), // 资源类型
+  action: varchar('action', { length: 50 }).notNull(), // 操作类型
+  route: varchar('route', { length: 200 }), // 对应的路由
+  isSystem: boolean('is_system').default(false), // 是否为系统内置权限
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// 角色权限关联表
+export const rolePermissions = pgTable('role_permissions', {
+  id: serial('id').primaryKey(),
+  roleId: integer('role_id')
+    .notNull()
+    .references(() => roles.id, { onDelete: 'cascade' }),
+  permissionId: integer('permission_id')
+    .notNull()
+    .references(() => permissions.id, { onDelete: 'cascade' }),
+  grantedBy: integer('granted_by')
+    .references(() => users.id),
+  grantedAt: timestamp('granted_at').notNull().defaultNow(),
+});
+
+// 订阅配置表（管理员可配置）
+export const subscriptionConfigs = pgTable('subscription_configs', {
+  id: serial('id').primaryKey(),
+  tier: varchar('tier', { length: 20 }).notNull().unique(), // free, pro, enterprise
+  name: varchar('name', { length: 100 }).notNull(),
+  dailyQueries: integer('daily_queries').notNull().default(50),
+  aiAnalysisPerDay: integer('ai_analysis_per_day').notNull().default(10),
+  watchlistLimit: integer('watchlist_limit').notNull().default(5),
+  emailNotifications: boolean('email_notifications').default(false),
+  customAIConfig: boolean('custom_ai_config').default(false),
+  advancedFeatures: boolean('advanced_features').default(false),
+  price: decimal('price', { precision: 10, scale: 2 }).default('0.00'),
+  currency: varchar('currency', { length: 3 }).default('USD'),
+  isActive: boolean('is_active').default(true),
+  createdBy: integer('created_by').references(() => users.id),
+  updatedBy: integer('updated_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 export const teamsRelations = relations(teams, ({ many }) => ({
   teamMembers: many(teamMembers),
   activityLogs: many(activityLogs),
   invitations: many(invitations),
 }));
 
-export const usersRelations = relations(users, ({ many }) => ({
-  teamMembers: many(teamMembers),
-  invitationsSent: many(invitations),
-  analysisHistory: many(analysisHistory),
-  searchHistory: many(searchHistory),
-}));
+
 
 export const invitationsRelations = relations(invitations, ({ one }) => ({
   team: one(teams, {
@@ -385,6 +540,46 @@ export const alertsRelations = relations(alerts, ({ one }) => ({
   }),
 }));
 
+export const aiConfigsRelations = relations(aiConfigs, ({ one, many }) => ({
+  user: one(users, {
+    fields: [aiConfigs.userId],
+    references: [users.id],
+  }),
+  usage: many(aiConfigUsage),
+}));
+
+export const aiConfigUsageRelations = relations(aiConfigUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [aiConfigUsage.userId],
+    references: [users.id],
+  }),
+  config: one(aiConfigs, {
+    fields: [aiConfigUsage.configId],
+    references: [aiConfigs.id],
+  }),
+}));
+
+export const emailNotificationsRelations = relations(emailNotifications, ({ one }) => ({
+  user: one(users, {
+    fields: [emailNotifications.userId],
+    references: [users.id],
+  }),
+}));
+
+export const emailLogsRelations = relations(emailLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [emailLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const usageTrackingRelations = relations(usageTracking, ({ one }) => ({
+  user: one(users, {
+    fields: [usageTracking.userId],
+    references: [users.id],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
@@ -434,3 +629,92 @@ export type Alert = typeof alerts.$inferSelect;
 export type NewAlert = typeof alerts.$inferInsert;
 export type SearchHistory = typeof searchHistory.$inferSelect;
 export type NewSearchHistory = typeof searchHistory.$inferInsert;
+export type AIConfig = typeof aiConfigs.$inferSelect;
+export type NewAIConfig = typeof aiConfigs.$inferInsert;
+export type AIConfigUsage = typeof aiConfigUsage.$inferSelect;
+export type NewAIConfigUsage = typeof aiConfigUsage.$inferInsert;
+export type EmailNotification = typeof emailNotifications.$inferSelect;
+export type NewEmailNotification = typeof emailNotifications.$inferInsert;
+export type EmailLog = typeof emailLogs.$inferSelect;
+export type NewEmailLog = typeof emailLogs.$inferInsert;
+export type UsageTracking = typeof usageTracking.$inferSelect;
+export type NewUsageTracking = typeof usageTracking.$inferInsert;
+
+// 角色和权限相关类型
+export type Role = typeof roles.$inferSelect;
+export type NewRole = typeof roles.$inferInsert;
+export type UserRole = typeof userRoles.$inferSelect;
+export type NewUserRole = typeof userRoles.$inferInsert;
+export type Permission = typeof permissions.$inferSelect;
+export type NewPermission = typeof permissions.$inferInsert;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type NewRolePermission = typeof rolePermissions.$inferInsert;
+export type SubscriptionConfig = typeof subscriptionConfigs.$inferSelect;
+export type NewSubscriptionConfig = typeof subscriptionConfigs.$inferInsert;
+
+// 关系定义
+export const usersRelations = relations(users, ({ many }) => ({
+  teamMembers: many(teamMembers),
+  aiConfigs: many(aiConfigs),
+  aiConfigUsage: many(aiConfigUsage),
+  emailNotifications: many(emailNotifications),
+  emailLogs: many(emailLogs),
+  usageTracking: many(usageTracking),
+  userRoles: many(userRoles),
+  assignedRoles: many(userRoles, { relationName: 'assignedBy' }),
+  createdSubscriptionConfigs: many(subscriptionConfigs, { relationName: 'createdBy' }),
+  updatedSubscriptionConfigs: many(subscriptionConfigs, { relationName: 'updatedBy' }),
+}));
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  userRoles: many(userRoles),
+  rolePermissions: many(rolePermissions),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+  role: one(roles, {
+    fields: [userRoles.roleId],
+    references: [roles.id],
+  }),
+  assignedBy: one(users, {
+    fields: [userRoles.assignedBy],
+    references: [users.id],
+    relationName: 'assignedBy',
+  }),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, {
+    fields: [rolePermissions.roleId],
+    references: [roles.id],
+  }),
+  permission: one(permissions, {
+    fields: [rolePermissions.permissionId],
+    references: [permissions.id],
+  }),
+  grantedBy: one(users, {
+    fields: [rolePermissions.grantedBy],
+    references: [users.id],
+  }),
+}));
+
+export const subscriptionConfigsRelations = relations(subscriptionConfigs, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [subscriptionConfigs.createdBy],
+    references: [users.id],
+    relationName: 'createdBy',
+  }),
+  updatedBy: one(users, {
+    fields: [subscriptionConfigs.updatedBy],
+    references: [users.id],
+    relationName: 'updatedBy',
+  }),
+}));

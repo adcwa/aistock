@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createCheckoutSession } from '@/lib/payments/stripe';
+import { createCustomerPortalSession } from '@/lib/payments/stripe';
 import { getSession } from '@/lib/auth/session';
 import { db } from '@/lib/db/drizzle';
 import { teams, teamMembers } from '@/lib/db/schema';
@@ -12,11 +12,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
 
-    const { planId, successUrl, cancelUrl } = await request.json();
+    const { returnUrl } = await request.json();
 
-    if (!planId || !successUrl || !cancelUrl) {
+    if (!returnUrl) {
       return NextResponse.json(
-        { error: '缺少必要参数' },
+        { error: '缺少返回URL' },
         { status: 400 }
       );
     }
@@ -44,21 +44,16 @@ export async function POST(request: NextRequest) {
 
     const teamId = userTeam[0].teamId;
 
-    // 创建结账会话
-    const checkoutSession = await createCheckoutSession(
-      teamId,
-      planId,
-      successUrl,
-      cancelUrl
-    );
+    // 创建客户门户会话
+    const portalSession = await createCustomerPortalSession(teamId, returnUrl);
 
     return NextResponse.json({
       success: true,
-      url: checkoutSession.url
+      url: portalSession.url
     });
 
   } catch (error) {
-    console.error('Checkout error:', error);
+    console.error('Portal session error:', error);
     
     if (error instanceof Error) {
       return NextResponse.json(
@@ -68,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: '创建结账会话失败' },
+      { error: '创建客户门户会话失败' },
       { status: 500 }
     );
   }
