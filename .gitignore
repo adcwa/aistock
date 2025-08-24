@@ -42,3 +42,4 @@ postgres_data/
 
 # YoYo AI version control directory
 .yoyo/
+.env.vercel

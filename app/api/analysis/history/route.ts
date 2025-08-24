@@ -2,16 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { analysisHistory, stocks } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { withAuth, AuthenticatedRequest, validateUserAccess } from '@/lib/auth/api-middleware';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
+    const userId = validateUserAccess(request);
     const { searchParams } = new URL(request.url);
-    const userId = parseInt(searchParams.get('userId') || '0');
     const limit = parseInt(searchParams.get('limit') || '20');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
 
     // 获取用户的分析历史，包含股票信息
     const userAnalysisHistory = await db
@@ -72,4 +69,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

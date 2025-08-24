@@ -176,13 +176,14 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
 });
 
 const signUpSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z.string().min(1, '姓名是必填项').max(100),
+  email: z.string().email('请输入有效的邮箱地址'),
+  password: z.string().min(8, '密码至少需要8个字符'),
   inviteId: z.string().optional()
 });
 
 export const signUp = validatedAction(signUpSchema, async (data, formData) => {
-  const { email, password, inviteId } = data;
+  const { name, email, password, inviteId } = data;
 
   const existingUser = await db
     .select()
@@ -201,6 +202,7 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   const passwordHash = await hashPassword(password);
 
   const newUser: NewUser = {
+    name,
     email,
     passwordHash,
     role: 'owner' // Default role, will be overridden if there's an invitation

@@ -6,19 +6,19 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CircleIcon, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp } from 'lucide-react';
-import { signIn, signUp } from './actions';
+import { CircleIcon, Loader2, Eye, EyeOff, Mail, Lock, TrendingUp, ArrowRight } from 'lucide-react';
+import { signIn } from './actions';
 import { ActionState } from '@/lib/auth/middleware';
 import { useState } from 'react';
 
-export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
+export function SignInForm() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect');
   const priceId = searchParams.get('priceId');
   const inviteId = searchParams.get('inviteId');
   const [showPassword, setShowPassword] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
-    mode === 'signin' ? signIn : signUp,
+    signIn,
     { error: '' }
   );
 
@@ -34,13 +34,10 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          {mode === 'signin' ? '欢迎回来' : '创建账户'}
+          欢迎回来
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          {mode === 'signin' 
-            ? '登录您的账户以继续使用AI股票分析平台' 
-            : '注册新账户开始您的AI股票分析之旅'
-          }
+          登录您的账户以继续使用AI股票分析平台
         </p>
       </div>
 
@@ -59,19 +56,17 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                 <Mail className="h-4 w-4" />
                 邮箱地址
               </Label>
-              <div className="relative">
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  defaultValue={state.email}
-                  required
-                  maxLength={50}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder:text-gray-400"
-                  placeholder="请输入您的邮箱地址"
-                />
-              </div>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                defaultValue={state.email}
+                required
+                maxLength={50}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 placeholder:text-gray-400"
+                placeholder="请输入您的邮箱地址"
+              />
             </div>
 
             <div className="space-y-2">
@@ -87,9 +82,7 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete={
-                    mode === 'signin' ? 'current-password' : 'new-password'
-                  }
+                  autoComplete="current-password"
                   defaultValue={state.password}
                   required
                   minLength={8}
@@ -109,11 +102,6 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
                   )}
                 </button>
               </div>
-              {mode === 'signup' && (
-                <p className="text-xs text-gray-500">
-                  密码至少需要8个字符
-                </p>
-              )}
             </div>
 
             {state?.error && (
@@ -133,12 +121,13 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               {pending ? (
                 <>
                   <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                  处理中...
+                  登录中...
                 </>
-              ) : mode === 'signin' ? (
-                '登录'
               ) : (
-                '注册'
+                <>
+                  登录
+                  <ArrowRight className="h-4 w-4" />
+                </>
               )}
             </Button>
           </form>
@@ -150,43 +139,48 @@ export function Login({ mode = 'signin' }: { mode?: 'signin' | 'signup' }) {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-4 bg-white text-gray-500">
-                  {mode === 'signin' ? '还没有账户？' : '已有账户？'}
+                  还没有账户？
                 </span>
               </div>
             </div>
 
             <div className="mt-6">
               <Link
-                href={`${mode === 'signin' ? '/sign-up' : '/sign-in'}${
-                  redirect ? `?redirect=${redirect}` : ''
-                }${priceId ? `&priceId=${priceId}` : ''}`}
+                href={`/sign-up${redirect ? `?redirect=${redirect}` : ''}${priceId ? `&priceId=${priceId}` : ''}`}
                 className="w-full flex justify-center py-3 px-4 border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all duration-200"
               >
-                {mode === 'signin' ? '创建新账户' : '登录现有账户'}
+                创建新账户
               </Link>
             </div>
           </div>
         </div>
         
-        {/* 功能特色展示 */}
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="text-center">
-            <div className="mx-auto h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center mb-2">
-              <TrendingUp className="h-4 w-4 text-orange-600" />
+        {/* 登录优势展示 */}
+        <div className="mt-8 space-y-4">
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              您的投资助手
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 bg-orange-100 rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-3 w-3 text-orange-600" />
+                </div>
+                <span className="text-sm text-gray-700">AI驱动的股票分析</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <CircleIcon className="h-3 w-3 text-blue-600" />
+                </div>
+                <span className="text-sm text-gray-700">实时市场数据</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-6 w-6 bg-green-100 rounded-full flex items-center justify-center">
+                  <Lock className="h-3 w-3 text-green-600" />
+                </div>
+                <span className="text-sm text-gray-700">个性化投资组合</span>
+              </div>
             </div>
-            <p className="text-xs text-gray-600">AI智能分析</p>
-          </div>
-          <div className="text-center">
-            <div className="mx-auto h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-              <CircleIcon className="h-4 w-4 text-blue-600" />
-            </div>
-            <p className="text-xs text-gray-600">实时数据</p>
-          </div>
-          <div className="text-center">
-            <div className="mx-auto h-8 w-8 bg-green-100 rounded-full flex items-center justify-center mb-2">
-              <Lock className="h-4 w-4 text-green-600" />
-            </div>
-            <p className="text-xs text-gray-600">安全可靠</p>
           </div>
         </div>
       </div>

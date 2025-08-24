@@ -2,15 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/drizzle';
 import { watchlists, watchlistStocks, stocks } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { withAuth, AuthenticatedRequest, validateUserAccess } from '@/lib/auth/api-middleware';
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request: AuthenticatedRequest) => {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = parseInt(searchParams.get('userId') || '0');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
+    const userId = validateUserAccess(request);
 
     // 获取用户的所有观察列表
     const userWatchlists = await db
@@ -43,16 +39,17 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: AuthenticatedRequest) => {
   try {
+    const userId = validateUserAccess(request);
     const body = await request.json();
-    const { userId, name, description } = body;
+    const { name, description } = body;
 
-    if (!userId || !name) {
+    if (!name) {
       return NextResponse.json(
-        { error: 'User ID and name are required' },
+        { error: 'Watchlist name is required' },
         { status: 400 }
       );
     }
@@ -76,4 +73,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
